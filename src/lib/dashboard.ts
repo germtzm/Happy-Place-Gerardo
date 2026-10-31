@@ -604,6 +604,9 @@ export type DepartureNotice = {
   reminder_at: string | null;
 };
 
+/** Un départ est urgent quand un rappel a été envoyé. */
+export const isUrgentNotice = (n: DepartureNotice) => !!n.reminder_at;
+
 export async function fetchMyDepartureNotices(email: string): Promise<DepartureNotice[]> {
   const { data, error } = await supabase
     .from("departure_notices")

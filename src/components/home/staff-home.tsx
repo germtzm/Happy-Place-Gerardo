@@ -7,6 +7,7 @@ import {
   fetchMyDepartureNotices,
   fetchNews,
   fetchSubmissions,
+  isUrgentNotice,
 } from "@/lib/dashboard";
 import { BlockersSection } from "./blockers-section";
 import { MetricsSection } from "./metrics-section";
@@ -41,6 +42,7 @@ function useStaffCounts(email: string) {
     blockers: n(blockers.data?.length),
     metrics: n(metrics.data?.length),
     departures: n(departures.data?.length),
+    urgentDepartures: departures.data?.filter(isUrgentNotice).length ?? 0,
   };
 }
 
@@ -109,7 +111,17 @@ export function StaffHome({
       id: "gestion",
       label: management.label,
       count: counts.departures,
-      caption: "départs",
+      caption:
+        counts.urgentDepartures > 0 ? (
+          <>
+            départs{" "}
+            <span className="rounded-[4px] bg-[#FED2CE] px-xs text-[#72020E]">
+              {counts.urgentDepartures} urgent{counts.urgentDepartures > 1 ? "s" : ""}
+            </span>
+          </>
+        ) : (
+          "départs"
+        ),
       panel: management.panel,
     },
   ];

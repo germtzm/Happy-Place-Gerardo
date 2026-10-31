@@ -5,6 +5,7 @@ import {
   downloadAttachment,
   downloadDepartureZip,
   fetchMyDepartureNotices,
+  isUrgentNotice,
   markDepartureNoticeDownloaded,
   type DepartureNotice,
 } from "@/lib/dashboard";
@@ -12,12 +13,17 @@ import {
 const frDate = (iso: string) => new Intl.DateTimeFormat("fr-FR").format(new Date(iso));
 const frDay = (ymd: string) => ymd.split("-").reverse().join("/");
 
+/** Départs à traiter : une ligne par avis, avec les actions de téléchargement. */
 export function DepartureNotices({ email }: { email: string }) {
   const q = useQuery({
     queryKey: ["departure_notices", email.toLowerCase()],
     queryFn: () => fetchMyDepartureNotices(email),
   });
-  if (!q.data?.length) return null;
+  if (q.isError) return <p className="text-body-sm text-error">Les départs sont indisponibles.</p>;
+  if (q.data && q.data.length === 0) {
+    return <p className="text-body-sm text-on-surface-variant italic">Aucun départ à traiter.</p>;
+  }
+  if (!q.data) return <p className="text-body-sm text-on-surface-variant">Chargement…</p>;
   return (
     <div className="space-y-xs">
       {q.data.map((n) => (
@@ -32,7 +38,7 @@ function NoticeBanner({ notice: n, email }: { notice: DepartureNotice; email: st
   const [open, setOpen] = useState(false);
   const [zipping, setZipping] = useState(false);
   const count = n.documents.length;
-  const reminder = !!n.reminder_at;
+  const reminder = isUrgentNotice(n);
   const deleteOn = new Date(new Date(n.created_at).getTime() + 7 * 86400000).toISOString();
   const text =
     count === 0
@@ -65,7 +71,7 @@ function NoticeBanner({ notice: n, email }: { notice: DepartureNotice; email: st
   return (
     <div
       role={reminder ? "alert" : "status"}
-      className={`p-sm border space-y-xs ${reminder ? "border-error bg-error-container text-on-error-container" : "border-outline-variant bg-surface-container-lowest"}`}
+      className={`p-sm border space-y-xs ${reminder ? "border-[#72020E] bg-[#FED2CE] text-[#72020E]" : "border-outline-variant bg-surface-container-lowest"}`}
     >
       <p className="font-body-md">
         {reminder && <strong>Rappel : </strong>}

@@ -1,3 +1,4 @@
+import { DepartureNotices } from "@/components/departure-notices";
 import { StaffHome } from "./staff-home";
 import type { HomeProps } from "./types";
 
@@ -9,8 +10,11 @@ export function ManagerHome(props: HomeProps) {
       management={{
         label: "Gestion du personnel",
         panel: (
-          <section className="min-w-0 rounded-[8px] border border-[#CDCDD1] bg-surface-container-lowest p-md">
-            <p className="text-body-sm text-on-surface-variant italic">Bientôt disponible.</p>
+          <section className="min-w-0 space-y-xs rounded-[8px] border border-[#CDCDD1] bg-surface-container-lowest p-md">
+            <h2 className="mb-sm border-b border-[#CDCDD1] pb-xs font-headline-sm text-headline-sm text-primary">
+              Départs de mes équipes
+            </h2>
+            <DepartureNotices email={props.email} />
           </section>
         ),
       }}

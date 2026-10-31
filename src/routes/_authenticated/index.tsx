@@ -9,7 +9,6 @@ import { BrandHeader } from "@/components/brand-header";
 import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card";
 import { SubmissionReader } from "@/components/submission-reader";
 import { NewsReader } from "@/components/news-reader";
-import { DepartureNotices } from "@/components/departure-notices";
 import { BlockerArchive } from "@/components/dashboard-extras";
 import { AdminHome } from "@/components/home/admin-home";
 import { CollaborateurHome } from "@/components/home/collaborateur-home";
@@ -162,7 +161,6 @@ function ManagerSpace() {
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
       <BrandHeader />
       <main className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
-        {email && <DepartureNotices email={email} />}
         <HomeHeader
           email={email}
           roleLabel={roleLabel}
