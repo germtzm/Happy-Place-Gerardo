@@ -147,13 +147,13 @@ export async function fetchSubmissions(): Promise<Submission[]> {
   return (data ?? []) as Submission[];
 }
 
-export async function fetchMySubmissions(email: string): Promise<Submission[]> {
+export async function fetchMySubmissions(email: string, limit = 10): Promise<Submission[]> {
   const { data, error } = await db
     .from("submissions")
     .select("*")
     .ilike("submitted_by_email", email)
     .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(limit);
   if (error) throw error;
   return (data ?? []) as Submission[];
 }

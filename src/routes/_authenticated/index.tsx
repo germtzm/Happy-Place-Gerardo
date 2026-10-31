@@ -10,13 +10,12 @@ import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card
 import { SubmissionReader } from "@/components/submission-reader";
 import { NewsReader } from "@/components/news-reader";
 import { DepartureNotices } from "@/components/departure-notices";
-import { BlockerArchive, ValidatedSubmissions } from "@/components/dashboard-extras";
-import { BlockersSection } from "@/components/home/blockers-section";
+import { BlockerArchive } from "@/components/dashboard-extras";
+import { AdminHome } from "@/components/home/admin-home";
+import { CollaborateurHome } from "@/components/home/collaborateur-home";
 import { HomeHeader } from "@/components/home/home-header";
-import { MetricsSection } from "@/components/home/metrics-section";
-import { MySubmissions } from "@/components/home/my-submissions";
-import { NewsSection } from "@/components/home/news-section";
-import { PendingSubmissions } from "@/components/home/pending-submissions";
+import { ManagerHome } from "@/components/home/manager-home";
+import type { HomeProps } from "@/components/home/types";
 import {
   exportMyRecentSubmissions,
   REJECTION_CATEGORIES,
@@ -49,12 +48,17 @@ export const Route = createFileRoute("/_authenticated/")({
   component: ManagerSpace,
 });
 
+function Home(props: HomeProps) {
+  if (props.role === "admin") return <AdminHome {...props} />;
+  if (props.role === "manager") return <ManagerHome {...props} />;
+  return <CollaborateurHome {...props} />;
+}
+
 function ManagerSpace() {
   const qc = useQueryClient();
   const { role, email, user } = Route.useRouteContext();
   const isAdmin = role === "admin";
   const canReview = role === "admin" || role === "manager";
-  const canWriteNews = canReview;
   const myEmail = (email ?? "").toLowerCase();
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
   const myName =
@@ -172,40 +176,17 @@ function ManagerSpace() {
           }}
         />
 
-        <div className="bento-grid">
-          {/* News Management & Input */}
-          <NewsSection
-            isAdmin={isAdmin}
-            canWriteNews={canWriteNews}
-            myName={myName}
-            myEmail={myEmail}
-            onRead={setReadingNews}
-          />
-
-          {/* Pending Submissions */}
-          <PendingSubmissions
-            canReview={canReview}
-            onRead={setReading}
-            onReject={startReject}
-            onApprove={(s) => review.mutate({ id: s.id, status: "validée" })}
-          />
-
-          {/* Mes soumissions */}
-          <MySubmissions email={email} onRead={setReading} />
-
-          <ValidatedSubmissions
-            role={role}
-            email={myEmail}
-            managerTeams={myTeams.data ?? []}
-            onRead={setReading}
-          />
-
-          {/* Points Bloquants */}
-          <BlockersSection isAdmin={isAdmin} onOpenArchive={() => setArchiveOpen(true)} />
-
-          {/* Performance Hub */}
-          <MetricsSection isAdmin={isAdmin} />
-        </div>
+        <Home
+          role={role}
+          email={myEmail}
+          managerTeams={myTeams.data ?? []}
+          myName={myName}
+          onReadNews={setReadingNews}
+          onReadSubmission={setReading}
+          onReject={startReject}
+          onApprove={(s) => review.mutate({ id: s.id, status: "validée" })}
+          onOpenArchive={() => setArchiveOpen(true)}
+        />
       </main>
       <BlockerArchive open={archiveOpen} onClose={() => setArchiveOpen(false)} />
       <NewsReader news={readingNews} onClose={() => setReadingNews(null)} />

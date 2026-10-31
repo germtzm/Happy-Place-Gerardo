@@ -29,6 +29,39 @@ function metricLabel(metric: Metric | undefined, fallback: string) {
   return metric.label;
 }
 
+export function MetricTiles({ metrics }: { metrics: Metric[] | undefined }) {
+  return (
+    <div className="grid grid-cols-2 gap-sm mb-md">
+      <div className="p-sm bg-card border border-outline-variant text-center">
+        <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
+          {metricLabel(metricOf(metrics, "training_kpi"), "Taux de placement")}
+        </p>
+        <p className="font-display text-[32px] text-primary">
+          {formatMetric(metricOf(metrics, "training_kpi"), "—")}
+        </p>
+        <p className="text-[10px] text-on-surface-variant font-label-sm">
+          {trendText(metricOf(metrics, "training_kpi"))}
+          {deltaText(metricOf(metrics, "training_kpi")) &&
+            ` · ${deltaText(metricOf(metrics, "training_kpi"))}`}
+        </p>
+      </div>
+      <div className="p-sm bg-card border border-outline-variant text-center">
+        <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
+          {metricLabel(metricOf(metrics, "active_users"), "Missions actives")}
+        </p>
+        <p className="font-display text-[32px] text-primary">
+          {formatMetric(metricOf(metrics, "active_users"), "—")}
+        </p>
+        <p className="text-[10px] text-on-surface-variant font-label-sm">
+          {trendText(metricOf(metrics, "active_users"))}
+          {deltaText(metricOf(metrics, "active_users")) &&
+            ` · ${deltaText(metricOf(metrics, "active_users"))}`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function MetricsSection({ isAdmin }: { isAdmin: boolean }) {
   const qc = useQueryClient();
   const [nps, setNps] = useState<string>("");
@@ -49,34 +82,7 @@ export function MetricsSection({ isAdmin }: { isAdmin: boolean }) {
         <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs</h2>
         {isAdmin && <Icon name="settings" className="text-on-surface-variant cursor-pointer" />}
       </div>
-      <div className="grid grid-cols-2 gap-sm mb-md">
-        <div className="p-sm bg-card border border-outline-variant text-center">
-          <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-            {metricLabel(metricOf(metrics.data, "training_kpi"), "Taux de placement")}
-          </p>
-          <p className="font-display text-[32px] text-primary">
-            {formatMetric(metricOf(metrics.data, "training_kpi"), "—")}
-          </p>
-          <p className="text-[10px] text-on-surface-variant font-label-sm">
-            {trendText(metricOf(metrics.data, "training_kpi"))}
-            {deltaText(metricOf(metrics.data, "training_kpi")) &&
-              ` · ${deltaText(metricOf(metrics.data, "training_kpi"))}`}
-          </p>
-        </div>
-        <div className="p-sm bg-card border border-outline-variant text-center">
-          <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-            {metricLabel(metricOf(metrics.data, "active_users"), "Missions actives")}
-          </p>
-          <p className="font-display text-[32px] text-primary">
-            {formatMetric(metricOf(metrics.data, "active_users"), "—")}
-          </p>
-          <p className="text-[10px] text-on-surface-variant font-label-sm">
-            {trendText(metricOf(metrics.data, "active_users"))}
-            {deltaText(metricOf(metrics.data, "active_users")) &&
-              ` · ${deltaText(metricOf(metrics.data, "active_users"))}`}
-          </p>
-        </div>
-      </div>
+      <MetricTiles metrics={metrics.data} />
       {isAdmin && <div className="space-y-xs">
         <label className="font-label-sm text-label-sm text-on-surface-variant block">
           MODIFIER LE NPS CANDIDATS
