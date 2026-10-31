@@ -255,23 +255,12 @@ function rpcUntyped<T>(fn: string, args?: Record<string, unknown>) {
 
 /** Demandes validées lisibles par le connecté ; le masquage de l'auteur est appliqué par la base. */
 export async function fetchValidatedSubmissions(): Promise<ValidatedSubmission[]> {
-  const { data, error } = await rpcUntyped<Submission[]>("validated_submissions");
+  const { data, error } = await rpcUntyped<ValidatedSubmission[]>("validated_submissions");
   if (error) throw new Error(error.message);
-  const rows = (data ?? []) as Submission[];
-  const dates = new Map<string, string>();
-  if (rows.length) {
-    // L'historique peut ne pas être lisible pour tous : dans ce cas, date de soumission.
-    const { data: hist } = await db
-      .from("submission_status_history")
-      .select("submission_id, changed_at")
-      .eq("new_status", "validée")
-      .in("submission_id", rows.map((r) => r.id))
-      .order("changed_at", { ascending: false });
-    for (const h of hist ?? []) if (!dates.has(h.submission_id)) dates.set(h.submission_id, h.changed_at);
-  }
-  return rows
-    .map((r) => ({ ...r, validated_at: dates.get(r.id) ?? null }))
-    .sort((a, b) => (b.validated_at ?? b.created_at).localeCompare(a.validated_at ?? a.created_at));
+  // validated_at est calculé par la base (l'historique n'est pas lisible par tous les rôles).
+  return (data ?? []).sort((a, b) =>
+    (b.validated_at ?? b.created_at).localeCompare(a.validated_at ?? a.created_at),
+  );
 }
 
 export async function updateBlockerStatus(input: { id: string; status: string }) {
