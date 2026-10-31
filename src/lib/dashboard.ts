@@ -537,23 +537,14 @@ export async function fetchWaitingSince(
   const out: Record<string, string> = {};
   for (const s of submissions) out[s.id] = s.created_at;
   if (submissions.length === 0) return out;
-  const { data, error } = await supabase
-    .from("submission_status_history")
-    .select("submission_id, changed_at")
-    .in(
-      "submission_id",
-      submissions.map((s) => s.id),
-    )
-    .eq("new_status", "en attente")
-    .order("changed_at", { ascending: false });
-  // Historique illisible pour ce rôle : on garde created_at.
+  // La base ne renvoie que la date, et seulement pour les demandes du lecteur (ou de ses équipes).
+  const { data, error } = await rpcUntyped<{ submission_id: string; waiting_since: string }[]>(
+    "submission_waiting_since",
+    { _ids: submissions.map((s) => s.id) },
+  );
+  // Fonction indisponible : on garde created_at.
   if (error) return out;
-  const seen = new Set<string>();
-  for (const h of data ?? []) {
-    if (seen.has(h.submission_id)) continue;
-    seen.add(h.submission_id);
-    out[h.submission_id] = h.changed_at;
-  }
+  for (const h of data ?? []) out[h.submission_id] = h.waiting_since;
   return out;
 }
 
