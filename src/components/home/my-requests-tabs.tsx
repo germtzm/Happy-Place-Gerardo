@@ -1,5 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchMySubmissions, type Submission } from "@/lib/dashboard";
+import {
+  fetchMySubmissions,
+  fetchValidators,
+  fetchWaitingSince,
+  type Submission,
+} from "@/lib/dashboard";
 import { MySubmissionItem } from "./my-submissions";
 import { TabTiles, type TabTileDef } from "./tab-tiles";
 
@@ -24,6 +29,21 @@ export function MyRequestsTabs({
     retry: false,
   });
 
+  const pending = mine.data?.filter((s) => s.status === "en attente") ?? [];
+  const pendingKey = pending.map((s) => s.id).join(",");
+  const validators = useQuery({
+    queryKey: ["submission_validators", [...new Set(pending.map((s) => s.team))].sort()],
+    queryFn: () => fetchValidators(pending.map((s) => s.team)),
+    enabled: pending.length > 0,
+    retry: false,
+  });
+  const waiting = useQuery({
+    queryKey: ["submission_waiting", pendingKey],
+    queryFn: () => fetchWaitingSince(pending),
+    enabled: pending.length > 0,
+    retry: false,
+  });
+
   const tabs: TabTileDef[] = TABS.map((t) => {
     const items = mine.data?.filter((s) => s.status === t.status) ?? [];
     return {
@@ -42,7 +62,13 @@ export function MyRequestsTabs({
             </p>
           )}
           {items.map((s) => (
-            <MySubmissionItem key={s.id} s={s} onRead={onRead} />
+            <MySubmissionItem
+              key={s.id}
+              s={s}
+              onRead={onRead}
+              validators={validators.data?.[s.team]}
+              waitingSince={waiting.data?.[s.id] ?? s.created_at}
+            />
           ))}
         </>
       ),

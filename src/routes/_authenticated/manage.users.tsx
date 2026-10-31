@@ -107,7 +107,10 @@ function UsersPage() {
     onError,
   });
   const update = useMutation({
-    mutationFn: async (v: { id: string; role: AppRole; team?: string }) => {
+    mutationFn: async (v: { id: string; role: AppRole; team?: string; first_name?: string | null; last_name?: string | null }) => {
+      if (v.role === "manager" && (!v.first_name?.trim() || !v.last_name?.trim())) {
+        throw new Error("Renseigne d'abord le prénom et le nom de ce compte avant de le passer manager.");
+      }
       if (v.role === "collaborateur") {
         const parsed = teamSchema.safeParse(v.team ?? "");
         if (!parsed.success) throw new Error("Équipe requise pour un collaborateur : " + parsed.error.issues[0].message);
@@ -231,8 +234,10 @@ function UsersPage() {
     }
     const fn = nameSchema.safeParse(firstName);
     if (!fn.success) return setErr("Prénom : " + fn.error.issues[0].message);
+    if (!fn.data) return setErr("Prénom requis");
     const ln = nameSchema.safeParse(lastName);
     if (!ln.success) return setErr("Nom : " + ln.error.issues[0].message);
+    if (!ln.data) return setErr("Nom requis");
     setErr(null);
     add.mutate({ email: parsed.data, role, team, first_name: fn.data || null, last_name: ln.data || null });
   }
@@ -258,7 +263,7 @@ function UsersPage() {
         <input
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
-          placeholder="Prénom (facultatif)"
+          placeholder="Prénom (obligatoire)"
           aria-label="Prénom"
           maxLength={100}
           className="border border-outline-variant bg-surface px-sm py-xs font-body-md"
@@ -266,7 +271,7 @@ function UsersPage() {
         <input
           value={lastName}
           onChange={(e) => setLastName(e.target.value)}
-          placeholder="Nom (facultatif)"
+          placeholder="Nom (obligatoire)"
           aria-label="Nom"
           maxLength={100}
           className="border border-outline-variant bg-surface px-sm py-xs font-body-md"
@@ -327,7 +332,7 @@ function UsersPage() {
                   const next = e.target.value as AppRole;
                   if (next === "collaborateur") {
                     setRoleDialog({ id: u.id, email: u.email, team: u.team ?? "" });
-                  } else update.mutate({ id: u.id, role: next }, { onSuccess: () => toast.success("Rôle modifié") });
+                  } else update.mutate({ id: u.id, role: next, first_name: u.first_name, last_name: u.last_name }, { onSuccess: () => toast.success("Rôle modifié") });
                 }}
                 aria-label={`Rôle de ${u.email}`}
                 className="border border-outline-variant bg-surface px-sm py-xs font-body-md"

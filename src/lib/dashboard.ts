@@ -499,6 +499,51 @@ export async function fetchSubmissionHistory(submissionId: string): Promise<Subm
   return (data ?? []) as SubmissionStatusHistory[];
 }
 
+/** Prénoms des managers validateurs, par équipe. Équipe en erreur : absente du résultat (inconnu ≠ aucun). */
+export async function fetchValidators(teams: string[]): Promise<Record<string, string>> {
+  const distinct = [...new Set(teams)];
+  // La fonction n'est pas encore dans les types générés : appel typé à la main.
+  const rpc = supabase.rpc as unknown as (
+    fn: string,
+    args: { _team: string },
+  ) => PromiseLike<{ data: string | null; error: { message: string } | null }>;
+  const out: Record<string, string> = {};
+  await Promise.all(
+    distinct.map(async (team) => {
+      const { data, error } = await rpc.call(supabase, "submission_validators", { _team: team });
+      if (!error) out[team] = data ?? "";
+    }),
+  );
+  return out;
+}
+
+/** Date depuis laquelle chaque demande attend : dernier passage à « en attente », sinon created_at. */
+export async function fetchWaitingSince(
+  submissions: { id: string; created_at: string }[],
+): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const s of submissions) out[s.id] = s.created_at;
+  if (submissions.length === 0) return out;
+  const { data, error } = await supabase
+    .from("submission_status_history")
+    .select("submission_id, changed_at")
+    .in(
+      "submission_id",
+      submissions.map((s) => s.id),
+    )
+    .eq("new_status", "en attente")
+    .order("changed_at", { ascending: false });
+  // Historique illisible pour ce rôle : on garde created_at.
+  if (error) return out;
+  const seen = new Set<string>();
+  for (const h of data ?? []) {
+    if (seen.has(h.submission_id)) continue;
+    seen.add(h.submission_id);
+    out[h.submission_id] = h.changed_at;
+  }
+  return out;
+}
+
 export type MetricHistoryPoint = { id: string; metric_key: string; value: number; recorded_at: string };
 
 export async function fetchMetricHistory(key: string): Promise<MetricHistoryPoint[]> {

@@ -3,8 +3,21 @@ import { AttachmentLink } from "@/components/attachment-link";
 import { SubmissionPreview } from "@/components/expandable-card";
 import { Linkify } from "@/components/linkify";
 import { fetchMySubmissions, timeAgo, type Submission } from "@/lib/dashboard";
+import { waitingDays, waitingLabel } from "@/lib/waiting";
 
-export function MySubmissionItem({ s, onRead }: { s: Submission; onRead: (s: Submission) => void }) {
+/** Validateurs : undefined = inconnu (masqué), "" = aucun manager. Attente : date de début, si connue. */
+export function MySubmissionItem({
+  s,
+  onRead,
+  validators,
+  waitingSince,
+}: {
+  s: Submission;
+  onRead: (s: Submission) => void;
+  validators?: string;
+  waitingSince?: string;
+}) {
+  const pending = s.status === "en attente";
   return (
     <div className="p-sm border border-outline-variant bg-card min-w-0 overflow-hidden">
       <SubmissionPreview content={s.content} onOpen={() => onRead(s)} />
@@ -12,6 +25,20 @@ export function MySubmissionItem({ s, onRead }: { s: Submission; onRead: (s: Sub
       <p className="text-[11px] font-label-sm text-on-surface-variant uppercase mt-xs">
         {s.status} • {s.team} • {timeAgo(s.created_at)}
       </p>
+      {pending && (validators !== undefined || waitingSince) && (
+        <div className="mt-xs flex flex-wrap items-center gap-xs font-label-sm text-[11px] uppercase">
+          {validators !== undefined && (
+            <span className="text-[#68686D]">
+              Validateur : {validators || "aucun manager assigné"}
+            </span>
+          )}
+          {waitingSince && (
+            <span className="rounded-[4px] bg-[#F0D0BC] px-xs py-[2px] text-[#482A1D]">
+              {waitingLabel(waitingDays(waitingSince))}
+            </span>
+          )}
+        </div>
+      )}
       {s.status === "refusée" && s.rejection_category && (
         <div className="mt-xs p-xs bg-error-container text-on-error-container text-body-sm wrap-anywhere">
           <p className="font-bold">Motif : {s.rejection_category}</p>
