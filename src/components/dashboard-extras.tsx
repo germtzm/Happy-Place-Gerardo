@@ -88,19 +88,23 @@ export function ValidatedSubmissions({
   return (
     <section className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md">
       <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm mb-md">
-        <h2 className="font-headline-sm text-headline-sm text-primary">Demandes validées</h2>
-        <label className="flex items-center gap-xs font-label-sm text-label-sm text-on-surface-variant min-w-0">
-          <span className="sr-only">Filtrer par équipe</span>
-          <select
-            aria-label="Filtrer par équipe"
-            value={team}
-            onChange={(e) => { setTeam(e.target.value); setLimit(PAGE); }}
-            className="max-w-full bg-card border border-outline-variant p-xs focus:outline-none focus:border-primary"
-          >
-            <option value="">Toutes les équipes</option>
-            {teams.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </label>
+        <h2 className="font-headline-sm text-headline-sm text-primary">
+          {role === "collaborateur" ? "Demandes validées de mon équipe" : "Demandes validées"}
+        </h2>
+        {role !== "collaborateur" && (
+          <label className="flex items-center gap-xs font-label-sm text-label-sm text-on-surface-variant min-w-0">
+            <span className="sr-only">Filtrer par équipe</span>
+            <select
+              aria-label="Filtrer par équipe"
+              value={team}
+              onChange={(e) => { setTeam(e.target.value); setLimit(PAGE); }}
+              className="max-w-full bg-card border border-outline-variant p-xs focus:outline-none focus:border-primary"
+            >
+              <option value="">Toutes les équipes</option>
+              {teams.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+        )}
       </div>
       {q.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
       {q.isError && <p className="text-body-sm text-error">Les demandes validées sont indisponibles.</p>}
