@@ -25,11 +25,18 @@ export function TabTiles({
   const tileRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key)) return;
     e.preventDefault();
-    const i = tabs.findIndex((t) => t.id === active);
-    const step = e.key === "ArrowRight" ? 1 : -1;
-    const next = tabs[(i + step + tabs.length) % tabs.length];
+    // Toutes les tuiles sont atteignables avec Tab : on part de la tuile focalisée, pas de l'active.
+    const focused = tabs.findIndex((t) => tileRefs.current[t.id] === document.activeElement);
+    const i = focused >= 0 ? focused : tabs.findIndex((t) => t.id === active);
+    const nextIndex =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? tabs.length - 1
+          : (i + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+    const next = tabs[nextIndex];
     setActive(next.id);
     tileRefs.current[next.id]?.focus();
   }
@@ -55,7 +62,7 @@ export function TabTiles({
               id={`tab-${t.id}`}
               aria-selected={selected}
               aria-controls={`panel-${t.id}`}
-              tabIndex={selected ? 0 : -1}
+              tabIndex={0}
               onClick={() => setActive(t.id)}
               className={`min-w-0 rounded-[8px] border p-sm text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 selected
