@@ -9,34 +9,28 @@ const PERF_IMAGE =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuAz-Y4URSqOCzUaVC6vomdu54tTiFPC_bF9A_h0SjxJ1mq2OlNfOyeKTNkPIgtPRloYwE5JrWFm2FHBNUq0GScs0ALDVMiq16FLu95dHNGPjmybEoIb2uyz1OGozRn0XkudSMukcPY4gKfeOJMR_KAnhYbkZifswTCbpCs_aHZyMuoZRz_oc4KsWtWiryTdwVD0EKyvxScj3palbDIM2wMlnH0njPGj912mRwhMmTo3Yu07l6xfVv2Zuw";
 
 export function MetricTiles({ metrics }: { metrics: Metric[] | undefined }) {
+  if (metrics?.length === 0) {
+    return (
+      <p className="mb-md text-body-sm italic text-on-surface-variant">Aucun indicateur publié.</p>
+    );
+  }
   return (
-    <div className="grid grid-cols-2 gap-sm mb-md">
-      <div className="p-sm bg-card border border-outline-variant text-center">
-        <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-          {metricLabel(metricOf(metrics, "training_kpi"), "Taux de placement")}
-        </p>
-        <p className="font-display text-[32px] text-primary">
-          {formatMetric(metricOf(metrics, "training_kpi"), "—")}
-        </p>
-        <p className="text-[10px] text-on-surface-variant font-label-sm">
-          {trendText(metricOf(metrics, "training_kpi"))}
-          {deltaText(metricOf(metrics, "training_kpi")) &&
-            ` · ${deltaText(metricOf(metrics, "training_kpi"))}`}
-        </p>
-      </div>
-      <div className="p-sm bg-card border border-outline-variant text-center">
-        <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-          {metricLabel(metricOf(metrics, "active_users"), "Missions actives")}
-        </p>
-        <p className="font-display text-[32px] text-primary">
-          {formatMetric(metricOf(metrics, "active_users"), "—")}
-        </p>
-        <p className="text-[10px] text-on-surface-variant font-label-sm">
-          {trendText(metricOf(metrics, "active_users"))}
-          {deltaText(metricOf(metrics, "active_users")) &&
-            ` · ${deltaText(metricOf(metrics, "active_users"))}`}
-        </p>
-      </div>
+    <div className="grid grid-cols-1 gap-sm mb-md md:grid-cols-4">
+      {metrics?.map((m) => {
+        const delta = deltaText(m);
+        return (
+          <div key={m.key} className="p-xs bg-card border border-outline-variant text-center">
+            <p className="font-label-sm text-label-sm text-on-surface-variant uppercase">
+              {metricLabel(m, m.label)}
+            </p>
+            <p className="font-display text-[26px] text-primary">{formatMetric(m, "—")}</p>
+            <p className="text-[10px] text-on-surface-variant font-label-sm">
+              {trendText(m)}
+              {delta && ` · ${delta}`}
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 }
