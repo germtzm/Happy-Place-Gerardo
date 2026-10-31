@@ -1,33 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { deltaText, fetchMetrics, TREND_LABELS, updateMetric, type Metric } from "@/lib/dashboard";
+import { deltaText, fetchMetrics, updateMetric, type Metric } from "@/lib/dashboard";
 import { Icon } from "./icon";
+import { formatMetric, metricLabel, metricOf, trendText } from "./metrics-format";
 
 const PERF_IMAGE =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuAz-Y4URSqOCzUaVC6vomdu54tTiFPC_bF9A_h0SjxJ1mq2OlNfOyeKTNkPIgtPRloYwE5JrWFm2FHBNUq0GScs0ALDVMiq16FLu95dHNGPjmybEoIb2uyz1OGozRn0XkudSMukcPY4gKfeOJMR_KAnhYbkZifswTCbpCs_aHZyMuoZRz_oc4KsWtWiryTdwVD0EKyvxScj3palbDIM2wMlnH0njPGj912mRwhMmTo3Yu07l6xfVv2Zuw";
-
-function trendText(m: Metric | undefined) {
-  return m ? TREND_LABELS[m.trend] : "";
-}
-
-function metricOf(metrics: Metric[] | undefined, key: string) {
-  return metrics?.find((m) => m.key === key);
-}
-
-function formatMetric(m: Metric | undefined, fallback: string) {
-  if (!m) return fallback;
-  const v = Number(m.value);
-  const formatted = m.unit === "%" ? v.toFixed(1) : v.toLocaleString("fr-FR");
-  return `${formatted}${m.unit ?? ""}`;
-}
-
-function metricLabel(metric: Metric | undefined, fallback: string) {
-  if (!metric) return fallback;
-  if (metric.key === "training_kpi") return "Taux de placement";
-  if (metric.key === "active_users") return "Missions actives";
-  return metric.label;
-}
 
 export function MetricTiles({ metrics }: { metrics: Metric[] | undefined }) {
   return (
