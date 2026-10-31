@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   fetchMySubmissions,
+  fetchValidatedSubmissions,
   fetchValidators,
   fetchWaitingSince,
   type Submission,
 } from "@/lib/dashboard";
+import { ValidatedSubmissions } from "@/components/dashboard-extras";
 import { MySubmissionItem } from "./my-submissions";
 import { TabTiles, type TabTileDef } from "./tab-tiles";
 
@@ -44,6 +46,13 @@ export function MyRequestsTabs({
     retry: false,
   });
 
+  // Même clé que le bloc ValidatedSubmissions : une seule requête, partagée avec le compteur de la tuile.
+  const teamValidated = useQuery({
+    queryKey: ["submissions", "validated"],
+    queryFn: fetchValidatedSubmissions,
+    retry: false,
+  });
+
   const tabs: TabTileDef[] = TABS.map((t) => {
     const items = mine.data?.filter((s) => s.status === t.status) ?? [];
     return {
@@ -74,6 +83,20 @@ export function MyRequestsTabs({
       ),
     };
   });
+  tabs.push({
+    id: "equipe",
+    label: "Validées de l'équipe",
+    count: teamValidated.data?.length ?? "–",
+    panel: (
+      <ValidatedSubmissions
+        embedded
+        role="collaborateur"
+        email={email}
+        managerTeams={[]}
+        onRead={onRead}
+      />
+    ),
+  });
 
   return (
     <section className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md">
@@ -84,7 +107,7 @@ export function MyRequestsTabs({
         tabs={tabs}
         ariaLabel="Statut de mes demandes"
         defaultId="en-attente"
-        gridClassName="grid-cols-3"
+        gridClassName="grid-cols-2 md:grid-cols-4"
       />
     </section>
   );

@@ -25,6 +25,11 @@ export function MySubmissionItem({
       <p className="text-[11px] font-label-sm text-on-surface-variant uppercase mt-xs">
         {s.status} • {s.team} • {timeAgo(s.created_at)}
       </p>
+      {s.hide_author && (
+        <p className="text-[11px] font-label-sm uppercase mt-xs">
+          Signée : {s.author_name} <span className="text-[#68686D]">(masqué pour l'équipe)</span>
+        </p>
+      )}
       {pending && (validators !== undefined || waitingSince) && (
         <div className="mt-xs flex flex-wrap items-center gap-xs font-label-sm text-[11px] uppercase">
           {validators !== undefined && (

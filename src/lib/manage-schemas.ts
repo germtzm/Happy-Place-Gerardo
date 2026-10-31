@@ -19,7 +19,7 @@ export const rejectionSchema = z.object({
   }),
 });
 
-export const submissionSchema = z.object({
+const submissionBase = z.object({
   author_name: z.string().trim().min(2, "Nom requis").max(80, "80 caractères maximum"),
   team: z.string().trim().min(2, "Pôle requis").max(60, "60 caractères maximum"),
   content: z.string().trim().min(5, "5 caractères minimum").superRefine((v, ctx) => {
@@ -31,7 +31,9 @@ export const submissionSchema = z.object({
   }),
   rejection_category: z.string().nullable().optional(),
   rejection_note: z.string().nullable().optional(),
-}).superRefine((v, ctx) => {
+});
+
+function refineRejection(v: { status: string; rejection_category?: string | null; rejection_note?: string | null }, ctx: z.RefinementCtx) {
   if (v.status !== "refusée") return;
   if (!v.rejection_category || !(REJECTION_CATEGORY_VALUES as readonly string[]).includes(v.rejection_category))
     ctx.addIssue({ code: "custom", path: ["rejection_category"], message: "Choisis un motif de refus" });
@@ -39,7 +41,15 @@ export const submissionSchema = z.object({
     ctx.addIssue({ code: "custom", path: ["rejection_note"], message: "La raison du refus est obligatoire" });
   else if (v.rejection_note.trim().length > 500)
     ctx.addIssue({ code: "custom", path: ["rejection_note"], message: rejectionTooLong(v.rejection_note.trim().length) });
-});
+}
+
+/** Saisie complète (gestion des données) : l'auteur est obligatoire. */
+export const submissionSchema = submissionBase.superRefine(refineRejection);
+
+/** Proposition depuis l'accueil : l'auteur est posé par la base (prénom du compte). */
+export const ideaSchema = submissionBase
+  .extend({ author_name: z.string().optional(), hide_author: z.boolean().optional() })
+  .superRefine(refineRejection);
 
 export const blockerSchema = z.object({
   title: z.string().trim().min(3, "Le titre doit faire au moins 3 caractères").max(160, "160 caractères maximum"),

@@ -18,6 +18,7 @@ import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card
 import { Linkify } from "@/components/linkify";
 import { SubmissionReader } from "@/components/submission-reader";
 import { SubmissionHistory } from "@/components/manage/submission-history";
+import { AuthorHiddenNote } from "@/components/author-hidden-note";
 import { submissionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
 import {
   REJECTION_CATEGORIES,
@@ -138,7 +139,7 @@ function ManageSubmissions() {
           >
             <div className="min-w-0 flex-1">
               <p className="font-body-md text-primary font-bold wrap-anywhere">
-                {s.author_name} — {s.team}
+                {s.author_name}<AuthorHiddenNote s={s} /> — {s.team}
               </p>
               <p className="text-body-sm text-on-surface-variant italic line-clamp-3 whitespace-pre-line wrap-anywhere">“<Linkify text={s.content} />”</p>
               <button

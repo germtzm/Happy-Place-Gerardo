@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { AttachmentLink } from "@/components/attachment-link";
+import { AuthorHiddenNote } from "@/components/author-hidden-note";
 import { SubmissionPreview } from "@/components/expandable-card";
 import { fetchSubmissions, timeAgo, type Submission } from "@/lib/dashboard";
 import { Icon } from "./icon";
@@ -52,7 +53,10 @@ export function PendingSubmissions({
                 <Icon name="person" className="text-sm" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="font-body-sm text-primary font-bold wrap-anywhere">{s.author_name}</p>
+                <p className="font-body-sm text-primary font-bold wrap-anywhere">
+                  {s.author_name}
+                  <AuthorHiddenNote s={s} />
+                </p>
                 <p className="text-[10px] text-on-surface-variant font-label-sm wrap-anywhere">{s.team}</p>
               </div>
               <span className="text-[10px] text-on-surface-variant font-label-sm whitespace-nowrap">

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ErrorSummary, Field, FormActions, Modal, TextArea, TextInput } from "@/components/manage/crud-ui";
-import { rejectionSchema, submissionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
+import { ideaSchema, rejectionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
 import { BrandHeader } from "@/components/brand-header";
 import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card";
 import { SubmissionReader } from "@/components/submission-reader";
@@ -17,6 +17,7 @@ import { ManagerHome } from "@/components/home/manager-home";
 import type { HomeProps } from "@/components/home/types";
 import {
   exportMyRecentSubmissions,
+  fetchMyFirstName,
   REJECTION_CATEGORIES,
   type News,
   type Submission,
@@ -78,6 +79,12 @@ function ManagerSpace() {
       return (data ?? []).map((t) => t.team).sort();
     },
   });
+  const myFirstName = useQuery({
+    queryKey: ["my_first_name", myEmail],
+    enabled: !!myEmail,
+    queryFn: () => fetchMyFirstName(myEmail),
+    retry: false,
+  });
   const [attachment, setAttachment] = useState<File | null>(null);
   const [rejecting, setRejecting] = useState<Submission | null>(null);
   const [reading, setReading] = useState<Submission | null>(null);
@@ -129,6 +136,7 @@ function ManagerSpace() {
       author_name: input.author_name,
       team: input.team,
       content: input.content,
+      hide_author: input.hide_author,
     }, attachment),
     onSuccess: () => {
       setSubmissionForm(null);
@@ -148,13 +156,18 @@ function ManagerSpace() {
     // Collaborators: team is set server-side from their account
     // Admin: always the « Admin » team (set server-side); manager: one of their teams
     const team = role === "collaborateur" ? "auto" : role === "admin" ? "Admin" : submissionForm.team;
-    const result = validate(submissionSchema, { ...submissionForm, team, status: "en attente" });
+    const result = validate(ideaSchema, { ...submissionForm, team, status: "en attente" });
     if (!result.ok) {
       setSubmissionErrors(result.errors);
       return;
     }
     setSubmissionErrors({});
-    submit.mutate(result.data);
+    const firstName = myFirstName.data?.trim();
+    if (!firstName) {
+      setSubmissionErrors({ author_name: "Ton prénom est introuvable : contacte un administrateur." });
+      return;
+    }
+    submit.mutate({ ...result.data, author_name: firstName });
   }
 
   return (
@@ -170,7 +183,13 @@ function ManagerSpace() {
           onSubmitIdea={() => {
             setSubmissionErrors({});
             const only = role === "manager" && myTeams.data?.length === 1 ? myTeams.data[0] : "";
-            setSubmissionForm({ author_name: "", team: only, content: "", status: "en attente" });
+            setSubmissionForm({
+              author_name: "",
+              team: only,
+              content: "",
+              status: "en attente",
+              hide_author: false,
+            });
           }}
         />
 
@@ -243,14 +262,25 @@ function ManagerSpace() {
         <Modal title="Soumettre une proposition" onClose={() => setSubmissionForm(null)}>
           <form onSubmit={sendSubmission} className="space-y-sm" noValidate>
             <ErrorSummary errors={submissionErrors} />
-            <Field label="Nom" error={submissionErrors.author_name}>
-              <TextInput
-                value={submissionForm.author_name}
-                maxLength={80}
-                placeholder="Ton nom"
-                onChange={(e) => setSubmissionForm({ ...submissionForm, author_name: e.target.value })}
-              />
-            </Field>
+            <div>
+              <p className="text-body-md text-primary">
+                Signée : <strong>{myFirstName.data ?? "…"}</strong>
+              </p>
+              <label className="mt-xs flex items-start gap-xs text-body-md">
+                <input
+                  type="checkbox"
+                  className="mt-[3px]"
+                  checked={submissionForm.hide_author ?? false}
+                  onChange={(e) =>
+                    setSubmissionForm({ ...submissionForm, hide_author: e.target.checked })
+                  }
+                />
+                <span>Masquer mon prénom aux autres collaborateurs de l'équipe</span>
+              </label>
+              <p className="ml-[22px] text-body-sm text-on-surface-variant">
+                Ton manager et l'admin le voient toujours.
+              </p>
+            </div>
             {role === "manager" && (
               <Field label="Équipe" error={submissionErrors.team}>
                 <select

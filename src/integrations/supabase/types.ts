@@ -363,6 +363,7 @@ export type Database = {
           author_name: string
           content: string
           created_at: string
+          hide_author: boolean
           id: string
           rejection_category:
             | Database["public"]["Enums"]["rejection_category"]
@@ -379,6 +380,7 @@ export type Database = {
           author_name: string
           content: string
           created_at?: string
+          hide_author?: boolean
           id?: string
           rejection_category?:
             | Database["public"]["Enums"]["rejection_category"]
@@ -395,6 +397,7 @@ export type Database = {
           author_name?: string
           content?: string
           created_at?: string
+          hide_author?: boolean
           id?: string
           rejection_category?:
             | Database["public"]["Enums"]["rejection_category"]

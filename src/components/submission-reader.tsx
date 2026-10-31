@@ -1,6 +1,7 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Linkify } from "@/components/linkify";
 import { AttachmentLink } from "@/components/attachment-link";
+import { AuthorHiddenNote } from "@/components/author-hidden-note";
 import { formatExactDate } from "@/components/expandable-card";
 import type { Submission } from "@/lib/dashboard";
 
@@ -32,6 +33,7 @@ export function SubmissionReader({
               <div className="min-w-0">
                 <DialogPrimitive.Title className="font-headline-sm text-headline-sm text-primary wrap-anywhere">
                   {s.author_name}
+                  <AuthorHiddenNote s={s} />
                 </DialogPrimitive.Title>
                 <DialogPrimitive.Description className="font-label-sm text-label-sm text-on-surface-variant">
                   {s.team} • {(statusLabel ?? s.status).toUpperCase()} • Soumise le {formatExactDate(s.created_at)}

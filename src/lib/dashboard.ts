@@ -32,6 +32,7 @@ export type Submission = {
   submitted_by_email?: string | null;
   attachment_path?: string | null;
   attachment_name?: string | null;
+  hide_author?: boolean;
 };
 
 export const REJECTION_CATEGORIES = [
@@ -243,14 +244,19 @@ export async function fetchResolvedBlockers(): Promise<Blocker[]> {
 
 export type ValidatedSubmission = Submission & { validated_at: string | null };
 
-/** Demandes validées, toutes équipes (filtrées par les règles d'accès de la base). */
+/** Appel d'une fonction SQL pas encore présente dans les types générés. */
+function rpcUntyped<T>(fn: string, args?: Record<string, unknown>) {
+  const call = supabase.rpc as unknown as (
+    name: string,
+    args?: Record<string, unknown>,
+  ) => PromiseLike<{ data: T | null; error: { message: string } | null }>;
+  return call.call(supabase, fn, args);
+}
+
+/** Demandes validées lisibles par le connecté ; le masquage de l'auteur est appliqué par la base. */
 export async function fetchValidatedSubmissions(): Promise<ValidatedSubmission[]> {
-  const { data, error } = await db
-    .from("submissions")
-    .select("*")
-    .eq("status", "validée")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
+  const { data, error } = await rpcUntyped<Submission[]>("validated_submissions");
+  if (error) throw new Error(error.message);
   const rows = (data ?? []) as Submission[];
   const dates = new Map<string, string>();
   if (rows.length) {
@@ -313,6 +319,7 @@ export type SubmissionInput = {
   status: string;
   rejection_category?: string | null;
   rejection_note?: string | null;
+  hide_author?: boolean;
 };
 export type BlockerInput = {
   title: string;
@@ -406,9 +413,21 @@ export async function submitIdea(input: Omit<SubmissionInput, "status">, file?: 
   }
   const { error } = await db.from("submissions").insert({
     author_name: input.author_name, team: input.team, content: input.content, status: "en attente",
+    hide_author: input.hide_author ?? false,
     attachment_path, attachment_name,
   });
   if (error) throw error;
+}
+
+/** Prénom du compte connecté (la base le pose comme auteur de ses demandes). */
+export async function fetchMyFirstName(email: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("allowed_users")
+    .select("first_name")
+    .eq("email", email.toLowerCase())
+    .maybeSingle();
+  if (error) throw error;
+  return data?.first_name ?? null;
 }
 
 export async function downloadAttachment(path: string, name: string | null) {
@@ -502,15 +521,10 @@ export async function fetchSubmissionHistory(submissionId: string): Promise<Subm
 /** Prénoms des managers validateurs, par équipe. Équipe en erreur : absente du résultat (inconnu ≠ aucun). */
 export async function fetchValidators(teams: string[]): Promise<Record<string, string>> {
   const distinct = [...new Set(teams)];
-  // La fonction n'est pas encore dans les types générés : appel typé à la main.
-  const rpc = supabase.rpc as unknown as (
-    fn: string,
-    args: { _team: string },
-  ) => PromiseLike<{ data: string | null; error: { message: string } | null }>;
   const out: Record<string, string> = {};
   await Promise.all(
     distinct.map(async (team) => {
-      const { data, error } = await rpc.call(supabase, "submission_validators", { _team: team });
+      const { data, error } = await rpcUntyped<string>("submission_validators", { _team: team });
       if (!error) out[team] = data ?? "";
     }),
   );

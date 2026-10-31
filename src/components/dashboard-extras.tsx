@@ -2,6 +2,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AttachmentLink } from "@/components/attachment-link";
+import { AuthorHiddenNote } from "@/components/author-hidden-note";
 import { SubmissionPreview, formatExactDate } from "@/components/expandable-card";
 import { fetchResolvedBlockers, fetchValidatedSubmissions, type Submission } from "@/lib/dashboard";
 
@@ -69,11 +70,14 @@ export function ValidatedSubmissions({
   email,
   managerTeams,
   onRead,
+  embedded = false,
 }: {
   role: string | null | undefined;
   email: string;
   managerTeams: string[];
   onRead: (s: Submission) => void;
+  /** Dans une tuile-onglet : ni cadre ni titre propres (le filtre d'équipe n'existe que hors collaborateur). */
+  embedded?: boolean;
 }) {
   const q = useQuery({ queryKey: ["submissions", "validated"], queryFn: fetchValidatedSubmissions, retry: false });
   const [team, setTeam] = useState("");
@@ -86,8 +90,14 @@ export function ValidatedSubmissions({
   const shown = filtered.slice(0, limit);
 
   return (
-    <section className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md">
-      <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm mb-md">
+    <section
+      className={
+        embedded
+          ? "min-w-0"
+          : "col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md"
+      }
+    >
+      {!embedded && <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm mb-md">
         <h2 className="font-headline-sm text-headline-sm text-primary">
           {role === "collaborateur" ? "Demandes validées de mon équipe" : "Demandes validées"}
         </h2>
@@ -105,7 +115,7 @@ export function ValidatedSubmissions({
             </select>
           </label>
         )}
-      </div>
+      </div>}
       {q.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
       {q.isError && <p className="text-body-sm text-error">Les demandes validées sont indisponibles.</p>}
       {q.data && filtered.length === 0 && (
@@ -115,7 +125,7 @@ export function ValidatedSubmissions({
         {shown.map((s) => (
           <div key={s.id} className="p-sm border border-outline-variant bg-card min-w-0 overflow-hidden space-y-xs">
             <p className="text-[11px] font-label-sm text-on-surface-variant uppercase wrap-anywhere">
-              <span className="text-primary font-bold">{s.author_name}</span> • {s.team} •{" "}
+              <span className="text-primary font-bold">{s.author_name}</span><AuthorHiddenNote s={s} /> • {s.team} •{" "}
               {s.validated_at ? `Validée le ${formatExactDate(s.validated_at)}` : `Soumise le ${formatExactDate(s.created_at)}`}
             </p>
             <SubmissionPreview content={s.content} onOpen={() => onRead(s)} />
