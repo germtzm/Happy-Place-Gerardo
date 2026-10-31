@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import sharkLogo from "@/assets/bigger-boat-shark.png";
+import { NotificationBell } from "@/components/home/notification-bell";
 
-export function BrandHeader() {
+/** `email` : renseigné sur les pages connectées pour afficher la cloche des notifications. */
+export function BrandHeader({ email }: { email?: string }) {
   return (
     <header className="border-b border-outline-variant bg-surface-container-lowest">
       <div className="mx-auto flex min-h-16 w-full max-w-interface items-center justify-between gap-md px-sm py-xs md:px-md">
@@ -21,9 +23,12 @@ export function BrandHeader() {
             Bigger Boat
           </span>
         </Link>
-        <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-          Happy Place
-        </span>
+        <div className="flex items-center gap-xs">
+          <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+            Happy Place
+          </span>
+          {email && <NotificationBell email={email} />}
+        </div>
       </div>
     </header>
   );

@@ -419,6 +419,16 @@ export async function fetchMyFirstName(email: string): Promise<string | null> {
   return data?.first_name ?? null;
 }
 
+/** Notifications non lues du connecté : la RLS ne renvoie que ses lignes, pas de filtre côté client. */
+export async function fetchUnreadNotificationCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .is("read_at", null);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function downloadAttachment(path: string, name: string | null) {
   const { data, error } = await db.storage.from(ATTACHMENT_BUCKET).createSignedUrl(path, 60, {
     download: name ?? true,

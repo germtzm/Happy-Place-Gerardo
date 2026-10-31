@@ -120,6 +120,7 @@ function ManagerSpace() {
         setReading((r) => (r?.id === vars.id ? null : r));
       }
       qc.invalidateQueries({ queryKey: ["submissions"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
     onError: (e: unknown) => toast.error(rejectionErrorMessage(e)),
   });
@@ -144,6 +145,7 @@ function ManagerSpace() {
       setSubmissionErrors({});
       toast.success("Soumission envoyée");
       qc.invalidateQueries({ queryKey: ["submissions"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
     onError: (e: unknown) => toast.error(rejectionErrorMessage(e)),
   });
@@ -172,7 +174,7 @@ function ManagerSpace() {
 
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
-      <BrandHeader />
+      <BrandHeader email={myEmail} />
       <main className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
         <HomeHeader
           email={email}
