@@ -8,4 +8,4 @@
 - News images live in the private `news-media` bucket at `{news_id}/{uuid}.{ext}`; storage write rights mirror news edit rights via `private.can_edit_news_media`, and the app removes old files itself (before deleting the row) because storage objects cannot be deleted from SQL.
 - Keep metric delta and value formatting in shared dashboard helpers so management rows and dashboard trends interpret numeric text consistently.
 
-- Version élèves : la connexion est libre et chaque compte choisit son rôle via `public.choisir_mon_role` (écran `/choisir-role`). Ne pas réintroduire de liste blanche : les règles RLS par rôle restent la référence.
+- Auth : liste blanche gérée par l'admin (`allowed_users`, `allowed_user_roles`), connexion par email et mot de passe, rôles attribués uniquement par un admin. `public.choisir_mon_role` n'est plus exécutable (migration `20261031100000`) : ne pas la réintroduire ni rétablir le choix libre du rôle. Les règles RLS par rôle restent la référence.
