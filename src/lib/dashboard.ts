@@ -429,6 +429,75 @@ export async function fetchUnreadNotificationCount(): Promise<number> {
   return count ?? 0;
 }
 
+export type NotificationType = "nouvelle_demande" | "decision";
+
+export type NotificationItem = {
+  id: string;
+  type: NotificationType;
+  submission_id: string;
+  created_at: string;
+  read_at: string | null;
+  /** Demande liée, lue avec la RLS existante ; null si elle n'est plus lisible. */
+  submission: Submission | null;
+};
+
+/** 20 dernières notifications du connecté (RLS : ses lignes), avec la demande liée si lisible. */
+export async function fetchNotifications(): Promise<NotificationItem[]> {
+  const { data, error } = await db
+    .from("notifications")
+    .select("id, type, submission_id, created_at, read_at")
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) throw error;
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+
+  const ids = [...new Set(rows.map((r) => r.submission_id))];
+  const { data: subs, error: subsError } = await db.from("submissions").select("*").in("id", ids);
+  if (subsError) throw subsError;
+  const byId = new Map((subs ?? []).map((s) => [s.id, s as Submission]));
+
+  return rows.map((r) => ({
+    ...r,
+    type: r.type as NotificationType,
+    submission: byId.get(r.submission_id) ?? null,
+  }));
+}
+
+/** Marque une notification comme lue ; sans effet si elle l'est déjà. */
+export async function markNotificationRead(id: string) {
+  const { error } = await db
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("read_at", null);
+  if (error) throw error;
+}
+
+const NOTIFICATION_EXCERPT_LENGTH = 80;
+
+/** Titre d'une ligne de notification ; sans demande lisible, un libellé générique sans détail. */
+export function notificationTitle(n: {
+  type: string;
+  submission: Pick<Submission, "author_name" | "team" | "status"> | null;
+}): string {
+  const s = n.submission;
+  if (n.type === "nouvelle_demande") {
+    return s ? `Nouvelle demande de ${s.author_name} (${s.team})` : "Nouvelle demande";
+  }
+  if (s?.status === "validée") return "Ta demande a été validée";
+  if (s?.status === "refusée") return "Ta demande a été refusée";
+  return "Décision sur ta demande";
+}
+
+/** 80 premiers caractères du texte de la demande (calculé à l'affichage, jamais stocké). */
+export function notificationExcerpt(content: string | null | undefined): string {
+  const text = (content ?? "").replace(/\s+/g, " ").trim();
+  const chars = Array.from(text);
+  if (chars.length <= NOTIFICATION_EXCERPT_LENGTH) return text;
+  return `${chars.slice(0, NOTIFICATION_EXCERPT_LENGTH).join("").trimEnd()}…`;
+}
+
 export async function downloadAttachment(path: string, name: string | null) {
   const { data, error } = await db.storage.from(ATTACHMENT_BUCKET).createSignedUrl(path, 60, {
     download: name ?? true,

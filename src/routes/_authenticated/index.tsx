@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ErrorSummary, Field, FormActions, Modal, TextArea, TextInput } from "@/components/manage/crud-ui";
 import { ideaSchema, rejectionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
@@ -14,6 +14,7 @@ import { AdminHome } from "@/components/home/admin-home";
 import { CollaborateurHome } from "@/components/home/collaborateur-home";
 import { HomeHeader } from "@/components/home/home-header";
 import { ManagerHome } from "@/components/home/manager-home";
+import { NotificationsView } from "@/components/home/notifications-view";
 import type { HomeProps } from "@/components/home/types";
 import {
   exportMyRecentSubmissions,
@@ -90,6 +91,15 @@ function ManagerSpace() {
   const [reading, setReading] = useState<Submission | null>(null);
   const [readingNews, setReadingNews] = useState<News | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const wasNotificationsOpen = useRef(false);
+  // Au retour de la vue Notifications, le focus revient sur la cloche qui réapparaît.
+  useEffect(() => {
+    if (wasNotificationsOpen.current && !notificationsOpen) {
+      document.getElementById("notification-bell")?.focus();
+    }
+    wasNotificationsOpen.current = notificationsOpen;
+  }, [notificationsOpen]);
   const [rejectForm, setRejectForm] = useState({ rejection_category: "", rejection_note: "" });
   const [rejectErrors, setRejectErrors] = useState<FieldErrors>({});
 
@@ -174,38 +184,52 @@ function ManagerSpace() {
 
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
-      <BrandHeader email={myEmail} />
+      <BrandHeader
+        email={myEmail}
+        onOpenNotifications={() => setNotificationsOpen(true)}
+        hideBell={notificationsOpen}
+      />
       <main className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
-        <HomeHeader
-          email={email}
-          roleLabel={roleLabel}
-          isAdmin={isAdmin}
-          exporting={exportReport.isPending}
-          onExport={() => exportReport.mutate()}
-          onSubmitIdea={() => {
-            setSubmissionErrors({});
-            const only = role === "manager" && myTeams.data?.length === 1 ? myTeams.data[0] : "";
-            setSubmissionForm({
-              author_name: "",
-              team: only,
-              content: "",
-              status: "en attente",
-              hide_author: false,
-            });
-          }}
-        />
+        {notificationsOpen && (
+          <NotificationsView
+            email={myEmail}
+            onBack={() => setNotificationsOpen(false)}
+            onReadSubmission={setReading}
+          />
+        )}
+        {/* L'accueil reste monté (masqué) pendant la vue Notifications : l'onglet actif est conservé. */}
+        <div hidden={notificationsOpen} className="space-y-md">
+          <HomeHeader
+            email={email}
+            roleLabel={roleLabel}
+            isAdmin={isAdmin}
+            exporting={exportReport.isPending}
+            onExport={() => exportReport.mutate()}
+            onSubmitIdea={() => {
+              setSubmissionErrors({});
+              const only = role === "manager" && myTeams.data?.length === 1 ? myTeams.data[0] : "";
+              setSubmissionForm({
+                author_name: "",
+                team: only,
+                content: "",
+                status: "en attente",
+                hide_author: false,
+              });
+            }}
+          />
 
-        <Home
-          role={role}
-          email={myEmail}
-          managerTeams={myTeams.data ?? []}
-          myName={myName}
-          onReadNews={setReadingNews}
-          onReadSubmission={setReading}
-          onReject={startReject}
-          onApprove={(s) => review.mutate({ id: s.id, status: "validée" })}
-          onOpenArchive={() => setArchiveOpen(true)}
-        />
+          <Home
+            role={role}
+            email={myEmail}
+            managerTeams={myTeams.data ?? []}
+            myName={myName}
+            onReadNews={setReadingNews}
+            onReadSubmission={setReading}
+            onReject={startReject}
+            onApprove={(s) => review.mutate({ id: s.id, status: "validée" })}
+            onOpenArchive={() => setArchiveOpen(true)}
+          />
+        </div>
       </main>
       <BlockerArchive open={archiveOpen} onClose={() => setArchiveOpen(false)} />
       <NewsReader news={readingNews} onClose={() => setReadingNews(null)} />

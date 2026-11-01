@@ -2,8 +2,19 @@ import { Link } from "@tanstack/react-router";
 import sharkLogo from "@/assets/bigger-boat-shark.png";
 import { NotificationBell } from "@/components/home/notification-bell";
 
-/** `email` : renseigné sur les pages connectées pour afficher la cloche des notifications. */
-export function BrandHeader({ email }: { email?: string }) {
+/**
+ * `email` et `onOpenNotifications` : renseignés sur l'accueil pour afficher la cloche des notifications ;
+ * `hideBell` la masque pendant que la vue Notifications est ouverte.
+ */
+export function BrandHeader({
+  email,
+  onOpenNotifications,
+  hideBell,
+}: {
+  email?: string;
+  onOpenNotifications?: () => void;
+  hideBell?: boolean;
+}) {
   return (
     <header className="border-b border-outline-variant bg-surface-container-lowest">
       <div className="mx-auto flex min-h-16 w-full max-w-interface items-center justify-between gap-md px-sm py-xs md:px-md">
@@ -27,7 +38,9 @@ export function BrandHeader({ email }: { email?: string }) {
           <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
             Happy Place
           </span>
-          {email && <NotificationBell email={email} />}
+          {email && onOpenNotifications && !hideBell && (
+            <NotificationBell email={email} onOpen={onOpenNotifications} />
+          )}
         </div>
       </div>
     </header>

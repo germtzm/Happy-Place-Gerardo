@@ -1,10 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { fetchUnreadNotificationCount } from "@/lib/dashboard";
 import { Icon } from "./icon";
 
-/** Cloche des notifications : nombre de non lues du connecté (la vue détaillée arrive en T10). */
-export function NotificationBell({ email }: { email: string }) {
+/** Cloche des notifications : nombre de non lues du connecté ; le clic ouvre la vue Notifications. */
+export function NotificationBell({ email, onOpen }: { email: string; onOpen: () => void }) {
   // Rafraîchie au retour du focus de l'onglet (comportement par défaut de TanStack Query,
   // basé sur visibilitychange) et par invalidation de ["notifications"] après une soumission ou une décision.
   const unread = useQuery({
@@ -18,7 +17,8 @@ export function NotificationBell({ email }: { email: string }) {
   return (
     <button
       type="button"
-      onClick={() => toast.info("Bientôt disponible")}
+      id="notification-bell"
+      onClick={onOpen}
       aria-label={`Notifications, ${count} non lue${count > 1 ? "s" : ""}`}
       className="relative flex items-center p-xs text-primary hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     >
