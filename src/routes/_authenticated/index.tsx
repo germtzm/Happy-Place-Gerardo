@@ -17,6 +17,7 @@ import { ManagerHome } from "@/components/home/manager-home";
 import { NotificationsView } from "@/components/home/notifications-view";
 import type { HomeProps } from "@/components/home/types";
 import {
+  canDecideSubmission,
   exportMyRecentSubmissions,
   fetchMyFirstName,
   REJECTION_CATEGORIES,
@@ -161,6 +162,12 @@ function ManagerSpace() {
   });
 
   const roleLabel = role === "admin" ? "ADMIN" : role === "manager" ? "MANAGER" : "COLLABORATEUR";
+  // Un manager ne décide pas de sa propre demande (la base le refuse aussi).
+  const readerCanDecide =
+    !!reading &&
+    canReview &&
+    reading.status === "en attente" &&
+    canDecideSubmission({ role, email: myEmail, submission: reading });
 
   function sendSubmission(e: React.FormEvent) {
     e.preventDefault();
@@ -236,9 +243,9 @@ function ManagerSpace() {
       <SubmissionReader
         submission={reading}
         onClose={() => setReading(null)}
-        onReject={reading && canReview && reading.status === "en attente" ? () => startReject(reading) : undefined}
+        onReject={readerCanDecide && reading ? () => startReject(reading) : undefined}
         onApprove={
-          reading && canReview && reading.status === "en attente"
+          readerCanDecide && reading
             ? () => review.mutate({ id: reading.id, status: "validée" })
             : undefined
         }

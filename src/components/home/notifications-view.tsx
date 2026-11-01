@@ -1,9 +1,8 @@
 import { useEffect, useRef } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { usePendingNotifications } from "./use-pending-notifications";
 import {
-  fetchNotifications,
-  fetchUnreadNotificationCount,
   markNotificationRead,
   notificationExcerpt,
   notificationTitle,
@@ -29,20 +28,10 @@ export function NotificationsView({
     titleRef.current?.focus();
   }, []);
 
-  const list = useQuery({
-    queryKey: ["notifications", "list", email],
-    queryFn: fetchNotifications,
-    enabled: !!email,
-    retry: false,
-  });
-  // Même clé que la cloche : le compteur reste cohérent avec la pastille.
-  const unread = useQuery({
-    queryKey: ["notifications", "unread", email],
-    queryFn: fetchUnreadNotificationCount,
-    enabled: !!email,
-    retry: false,
-  });
-  const unreadCount = unread.data ?? 0;
+  // Même requête que la cloche : liste et compteurs partagent la même règle et ne divergent jamais.
+  const pending = usePendingNotifications(email);
+  const items = pending.data?.items ?? [];
+  const unreadCount = pending.data?.unread ?? 0;
 
   const markRead = useMutation({
     mutationFn: markNotificationRead,
@@ -75,27 +64,24 @@ export function NotificationsView({
         >
           Notifications
         </h1>
-        <p
-          aria-live="polite"
-          className="font-label-sm text-label-sm uppercase text-[#68686D]"
-        >
+        <p aria-live="polite" className="font-label-sm text-label-sm uppercase text-[#68686D]">
           {unreadCount} NON LUE{unreadCount > 1 ? "S" : ""}
         </p>
       </div>
 
-      {list.isLoading ? (
+      {pending.isLoading ? (
         <p className="text-body-md text-[#68686D]">Chargement…</p>
-      ) : list.isError ? (
+      ) : pending.isError ? (
         <p role="alert" className="text-body-md text-error">
           Impossible de charger les notifications.
         </p>
-      ) : (list.data ?? []).length === 0 ? (
+      ) : items.length === 0 ? (
         <p className="rounded-[8px] border border-[#CDCDD1] bg-white p-md text-body-md text-[#68686D]">
-          Aucune notification.
+          Aucune notification à traiter.
         </p>
       ) : (
         <ul className="divide-y divide-[#CDCDD1] overflow-hidden rounded-[8px] border border-[#CDCDD1] bg-white">
-          {(list.data ?? []).map((n) => {
+          {items.map((n) => {
             const excerpt = notificationExcerpt(n.submission?.content);
             return (
               <li key={n.id} className="flex items-start gap-sm p-sm md:p-md">

@@ -1,18 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchUnreadNotificationCount } from "@/lib/dashboard";
 import { Icon } from "./icon";
+import { usePendingNotifications } from "./use-pending-notifications";
 
-/** Cloche des notifications : nombre de non lues du connecté ; le clic ouvre la vue Notifications. */
+/** Cloche des notifications : nombre de notifications à traiter ; le clic ouvre la vue Notifications. */
 export function NotificationBell({ email, onOpen }: { email: string; onOpen: () => void }) {
   // Rafraîchie au retour du focus de l'onglet (comportement par défaut de TanStack Query,
   // basé sur visibilitychange) et par invalidation de ["notifications"] après une soumission ou une décision.
-  const unread = useQuery({
-    queryKey: ["notifications", "unread", email],
-    queryFn: fetchUnreadNotificationCount,
-    enabled: !!email,
-    retry: false,
-  });
-  const count = unread.data ?? 0;
+  const pending = usePendingNotifications(email);
+  const count = pending.data?.unread ?? 0;
 
   return (
     <button

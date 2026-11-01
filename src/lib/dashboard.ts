@@ -285,6 +285,21 @@ export async function updateMetric(input: { key: string; value: number }) {
   if (error) throw error;
 }
 
+/**
+ * Qui peut valider ou refuser une demande en attente (miroir de la base : seul un manager ne peut
+ * pas décider de sa propre demande ; un admin le peut toujours ; la base reste la vraie barrière).
+ */
+export function canDecideSubmission(opts: {
+  role: string;
+  email: string;
+  submission: Pick<Submission, "submitted_by_email">;
+}): boolean {
+  if (opts.role === "admin") return true;
+  if (opts.role !== "manager") return false;
+  const author = opts.submission.submitted_by_email;
+  return !author || author.toLowerCase() !== opts.email.toLowerCase();
+}
+
 export function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.round(diff / 60000);
@@ -419,16 +434,6 @@ export async function fetchMyFirstName(email: string): Promise<string | null> {
   return data?.first_name ?? null;
 }
 
-/** Notifications non lues du connecté : la RLS ne renvoie que ses lignes, pas de filtre côté client. */
-export async function fetchUnreadNotificationCount(): Promise<number> {
-  const { count, error } = await supabase
-    .from("notifications")
-    .select("id", { count: "exact", head: true })
-    .is("read_at", null);
-  if (error) throw error;
-  return count ?? 0;
-}
-
 export type NotificationType = "nouvelle_demande" | "decision";
 
 export type NotificationItem = {
@@ -441,27 +446,67 @@ export type NotificationItem = {
   submission: Submission | null;
 };
 
-/** 20 dernières notifications du connecté (RLS : ses lignes), avec la demande liée si lisible. */
-export async function fetchNotifications(): Promise<NotificationItem[]> {
+const NOTIFICATION_LIST_LIMIT = 20;
+/** Garde-fou : nombre maximal de lignes lues en base avant filtrage. */
+const NOTIFICATION_FETCH_CAP = 200;
+
+/**
+ * Règle unique d'affichage, partagée par la liste et le compteur. Une nouvelle demande reste visible
+ * (lue ou non) tant que la demande liée est lisible et « en attente ». Une décision n'est visible
+ * que tant qu'elle est non lue, même si sa demande n'est plus lisible.
+ */
+export function isNotificationVisible(n: {
+  type: string;
+  read_at: string | null;
+  submission: Pick<Submission, "status"> | null;
+}): boolean {
+  if (n.type === "nouvelle_demande") return n.submission?.status === "en attente";
+  return n.read_at === null;
+}
+
+/**
+ * Applique la règle avant la limite, dans l'ordre reçu. `unread` compte les non lues (read_at NULL)
+ * parmi les lignes affichées : c'est le nombre de la cloche et du « N NON LUES ».
+ */
+export function selectVisibleNotifications<T extends Parameters<typeof isNotificationVisible>[0]>(
+  items: T[],
+  limit = NOTIFICATION_LIST_LIMIT,
+): { items: T[]; unread: number } {
+  const shown = items.filter(isNotificationVisible).slice(0, limit);
+  return { items: shown, unread: shown.filter((n) => n.read_at === null).length };
+}
+
+/**
+ * Notifications à traiter du connecté (RLS : ses lignes), plus récentes d'abord, avec la demande liée
+ * si lisible. Les décisions déjà lues sont exclues dès la lecture ; la liste est limitée à 20 après
+ * filtrage.
+ */
+export async function fetchPendingNotifications(): Promise<{
+  items: NotificationItem[];
+  unread: number;
+}> {
   const { data, error } = await db
     .from("notifications")
     .select("id, type, submission_id, created_at, read_at")
+    .or("read_at.is.null,type.eq.nouvelle_demande")
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(NOTIFICATION_FETCH_CAP);
   if (error) throw error;
   const rows = data ?? [];
-  if (rows.length === 0) return [];
+  if (rows.length === 0) return { items: [], unread: 0 };
 
   const ids = [...new Set(rows.map((r) => r.submission_id))];
   const { data: subs, error: subsError } = await db.from("submissions").select("*").in("id", ids);
   if (subsError) throw subsError;
   const byId = new Map((subs ?? []).map((s) => [s.id, s as Submission]));
 
-  return rows.map((r) => ({
-    ...r,
-    type: r.type as NotificationType,
-    submission: byId.get(r.submission_id) ?? null,
-  }));
+  return selectVisibleNotifications(
+    rows.map((r) => ({
+      ...r,
+      type: r.type as NotificationType,
+      submission: byId.get(r.submission_id) ?? null,
+    })),
+  );
 }
 
 /** Marque une notification comme lue ; sans effet si elle l'est déjà. */

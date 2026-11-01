@@ -2,16 +2,21 @@ import { useQuery } from "@tanstack/react-query";
 import { AttachmentLink } from "@/components/attachment-link";
 import { AuthorHiddenNote } from "@/components/author-hidden-note";
 import { SubmissionPreview } from "@/components/expandable-card";
-import { fetchSubmissions, timeAgo, type Submission } from "@/lib/dashboard";
+import { canDecideSubmission, fetchSubmissions, timeAgo, type Submission } from "@/lib/dashboard";
 import { Icon } from "./icon";
 
 export function PendingSubmissions({
   canReview,
+  role,
+  email,
   onRead,
   onReject,
   onApprove,
 }: {
   canReview: boolean;
+  role: string;
+  /** E-mail en minuscules du connecté. */
+  email: string;
   onRead: (s: Submission) => void;
   onReject: (s: Submission) => void;
   onApprove: (s: Submission) => void;
@@ -65,20 +70,27 @@ export function PendingSubmissions({
             </div>
             <SubmissionPreview content={s.content} onOpen={() => onRead(s)} />
             <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-            {canReview && <div className="flex gap-xs pt-xs">
-              <button
-                onClick={() => onReject(s)}
-                className="flex-1 py-1 border border-outline text-primary font-label-sm text-label-sm hover:bg-surface-container transition-colors"
-              >
-                REFUSER
-              </button>
-              <button
-                onClick={() => onApprove(s)}
-                className="flex-1 py-1 bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-colors"
-              >
-                VALIDER
-              </button>
-            </div>}
+            {canReview && canDecideSubmission({ role, email, submission: s }) && (
+              <div className="flex gap-xs pt-xs">
+                <button
+                  onClick={() => onReject(s)}
+                  className="flex-1 py-1 border border-outline text-primary font-label-sm text-label-sm hover:bg-surface-container transition-colors"
+                >
+                  REFUSER
+                </button>
+                <button
+                  onClick={() => onApprove(s)}
+                  className="flex-1 py-1 bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-colors"
+                >
+                  VALIDER
+                </button>
+              </div>
+            )}
+            {canReview && !canDecideSubmission({ role, email, submission: s }) && (
+              <p className="pt-xs text-body-sm italic text-on-surface-variant">
+                Ta demande : un autre manager ou un admin la traite.
+              </p>
+            )}
           </div>
         ))}
       </div>

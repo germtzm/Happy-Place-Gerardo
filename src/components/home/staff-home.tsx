@@ -64,6 +64,8 @@ export function StaffHome({
         <div className="space-y-md">
           <PendingSubmissions
             canReview
+            role={p.role}
+            email={p.email}
             onRead={p.onReadSubmission}
             onReject={p.onReject}
             onApprove={p.onApprove}
