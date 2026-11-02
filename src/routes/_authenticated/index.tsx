@@ -200,6 +200,7 @@ function ManagerSpace() {
         {notificationsOpen && (
           <NotificationsView
             email={myEmail}
+            role={role}
             onBack={() => setNotificationsOpen(false)}
             onReadSubmission={setReading}
           />

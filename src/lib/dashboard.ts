@@ -519,6 +519,154 @@ export async function markNotificationRead(id: string) {
   if (error) throw error;
 }
 
+/* ============================================================
+ * Récapitulatif du manager (B04) — préférences d'envoi
+ * ========================================================== */
+
+export type RecapFrequency = "desactive" | "quotidien" | "hebdomadaire";
+
+export type RecapPreferences = {
+  email: string;
+  channel_app: boolean;
+  channel_email: boolean;
+  /** Jour ISO : 1 = lundi … 7 = dimanche. */
+  send_day: number;
+  /** Heure de Paris, « HH:MM » ou « HH:MM:SS » selon la base. */
+  send_time: string;
+  frequency: RecapFrequency;
+  last_text: string | null;
+  last_sent_at: string | null;
+  updated_at: string;
+};
+
+/** Ce que l'écran envoie à save_my_recap (l'heure est au format « HH:MM »). */
+export type RecapInput = {
+  channel_app: boolean;
+  channel_email: boolean;
+  frequency: RecapFrequency;
+  send_day: number;
+  send_time: string;
+};
+
+export const RECAP_FREQUENCIES: RecapFrequency[] = ["desactive", "quotidien", "hebdomadaire"];
+export const RECAP_DEFAULT_DAY = 1;
+export const RECAP_DEFAULT_TIME = "08:00";
+export const RECAP_EMPTY_PREVIEW = "Aucun récapitulatif envoyé pour le moment.";
+
+/** Heures « 00 » à « 23 » (pas de 1) et minutes « 00 », « 15 », « 30 », « 45 » des compteurs d'envoi. */
+export const RECAP_HOURS: string[] = Array.from({ length: 24 }, (_, h) =>
+  String(h).padStart(2, "0"),
+);
+export const RECAP_MINUTES: string[] = ["00", "15", "30", "45"];
+
+/** Heure suivante (+1) ou précédente (−1), avec bouclage : 23 puis + donne 00, 00 puis − donne 23. */
+export function stepRecapHour(hour: string, delta: 1 | -1): string {
+  const parsed = Number.parseInt(hour, 10);
+  const current = Number.isInteger(parsed) && parsed >= 0 && parsed <= 23 ? parsed : 8;
+  return RECAP_HOURS[(current + delta + RECAP_HOURS.length) % RECAP_HOURS.length];
+}
+
+/**
+ * Minutes suivantes (+15) ou précédentes (−15), avec bouclage et sans toucher à l'heure :
+ * 45 puis + donne 00, 00 puis − donne 45.
+ */
+export function stepRecapMinute(minute: string, delta: 1 | -1): string {
+  const found = RECAP_MINUTES.indexOf(minute);
+  const current = found >= 0 ? found : 0;
+  return RECAP_MINUTES[(current + delta + RECAP_MINUTES.length) % RECAP_MINUTES.length];
+}
+
+/** Assemble les deux compteurs au format « HH:MM » envoyé à la base. */
+export function recapTimeFromParts(hour: string, minute: string): string {
+  return `${hour}:${minute}`;
+}
+
+/** « 08:15 » ou « 08:15:00 » → { hour: "08", minute: "15" }. */
+export function recapTimeParts(time: string | null | undefined): { hour: string; minute: string } {
+  const [hour, minute] = recapTimeLabel(time).split(":");
+  return { hour: hour ?? "08", minute: minute ?? "00" };
+}
+
+const RECAP_SLOT_PATTERN = /^([01]\d|2[0-3]):(00|15|30|45)(:00)?$/;
+
+/** « 08:00:00 » → « 08:00 » ; une valeur hors créneau est renvoyée telle quelle (la validation la refuse). */
+export function recapTimeLabel(time: string | null | undefined): string {
+  if (!time) return RECAP_DEFAULT_TIME;
+  return RECAP_SLOT_PATTERN.test(time) ? time.slice(0, 5) : time;
+}
+
+function isRecapDay(day: unknown): day is number {
+  return typeof day === "number" && Number.isInteger(day) && day >= 1 && day <= 7;
+}
+
+/**
+ * Message d'erreur lisible, ou null si la saisie est acceptée. Le jour n'est contrôlé que pour la
+ * fréquence « hebdomadaire » ; sans canal, seule la fréquence « désactivé » est acceptée.
+ */
+export function validateRecapInput(input: RecapInput): string | null {
+  if (!RECAP_FREQUENCIES.includes(input.frequency)) return "Choisis une fréquence d'envoi.";
+  if (input.frequency !== "desactive" && !input.channel_app && !input.channel_email) {
+    return "Choisis au moins un canal de réception.";
+  }
+  if (input.frequency === "hebdomadaire" && !isRecapDay(input.send_day)) {
+    return "Choisis un jour d'envoi, du lundi au dimanche.";
+  }
+  if (!RECAP_SLOT_PATTERN.test(input.send_time)) {
+    return "Choisis une heure d'envoi par créneaux de 15 minutes.";
+  }
+  return null;
+}
+
+/** Valeurs envoyées à la base : hors fréquence hebdomadaire, un jour invalide est remplacé par le lundi. */
+export function normalizeRecapInput(input: RecapInput): RecapInput {
+  return {
+    ...input,
+    send_day: isRecapDay(input.send_day) ? input.send_day : RECAP_DEFAULT_DAY,
+    send_time: recapTimeLabel(input.send_time),
+  };
+}
+
+/** « Dernière mise à jour : il y a 2 heures », ou null tant que rien n'est enregistré. */
+export function recapUpdatedLabel(updatedAt: string | null | undefined): string | null {
+  return updatedAt ? `Dernière mise à jour : ${timeAgo(updatedAt)}` : null;
+}
+
+/** Texte de l'aperçu : le dernier récapitulatif envoyé, ou une phrase neutre. */
+export function recapPreviewText(lastText: string | null | undefined): string {
+  return lastText && lastText.trim() ? lastText : RECAP_EMPTY_PREVIEW;
+}
+
+// Les types générés ne connaissent pas encore ces fonctions : appel typé à la main.
+type RecapRpcClient = {
+  rpc: (
+    fn: "get_my_recap" | "save_my_recap",
+    args?: Record<string, unknown>,
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+};
+
+/** Ma préférence de récapitulatif, ou la ligne par défaut non enregistrée (updated_at = maintenant). */
+export async function fetchMyRecap(): Promise<RecapPreferences> {
+  const { data, error } = await (supabase as unknown as RecapRpcClient).rpc("get_my_recap");
+  if (error) throw new Error(error.message);
+  return data as RecapPreferences;
+}
+
+/** Enregistre ma préférence ; l'appelant invalide ["recap"] ensuite. */
+export async function saveMyRecap(input: RecapInput): Promise<RecapPreferences> {
+  const invalid = validateRecapInput(input);
+  if (invalid) throw new Error(invalid);
+  const v = normalizeRecapInput(input);
+  const { data, error } = await (supabase as unknown as RecapRpcClient).rpc("save_my_recap", {
+    p_channel_app: v.channel_app,
+    p_channel_email: v.channel_email,
+    p_frequency: v.frequency,
+    p_send_day: v.send_day,
+    p_send_time: v.send_time,
+  });
+  if (error) throw new Error(error.message);
+  return data as RecapPreferences;
+}
+
 const NOTIFICATION_EXCERPT_LENGTH = 80;
 
 /** Titre d'une ligne de notification ; sans demande lisible, un libellé générique sans détail. */
