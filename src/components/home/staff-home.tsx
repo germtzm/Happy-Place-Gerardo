@@ -10,10 +10,9 @@ import {
   isUrgentNotice,
 } from "@/lib/dashboard";
 import { BlockersSection } from "./blockers-section";
-import { Icon } from "./icon";
 import { MetricsSection } from "./metrics-section";
 import { MySubmissions } from "./my-submissions";
-import { useNewsDraftDialog } from "./news-draft-dialog";
+import { useNewsDialog } from "./news-draft-dialog";
 import { NewsSection } from "./news-section";
 import { NewCountPill, PendingSubmissions } from "./pending-submissions";
 import { OVERVIEW_ID, plural } from "@/lib/side-nav";
@@ -70,7 +69,7 @@ export function StaffHome({
   ...p
 }: HomeProps & { isAdmin: boolean; management: ManagementTab }) {
   const counts = useStaffCounts(p.email);
-  const newsDialog = useNewsDraftDialog();
+  const newsDialog = useNewsDialog();
   const bottomSections = useBottomSections({
     email: p.email,
     role: p.role,
@@ -127,9 +126,9 @@ export function StaffHome({
           type="button"
           aria-haspopup="dialog"
           onClick={(e) => newsDialog.openCreate(e.currentTarget)}
-          className="flex min-h-[44px] items-center gap-xs bg-primary px-md py-xs font-label-md text-label-md text-on-primary shadow-sm transition-all hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          className="inline-flex min-h-[44px] items-center bg-primary px-md py-xs font-label-md text-label-md text-on-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
-          <Icon name="add" /> CRÉER UNE ACTUALITÉ
+          + NOUVELLE ACTUALITÉ
         </button>
       ),
       icon: "campaign",

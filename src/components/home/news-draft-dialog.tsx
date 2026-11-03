@@ -1,16 +1,17 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import {
   ErrorSummary,
   Field,
   FormActions,
   Modal,
+  Select,
   TextArea,
   TextInput,
 } from "@/components/manage/crud-ui";
 import { NewsMediaEditor } from "@/components/news-media";
-import { saveDraftNews, type News } from "@/lib/dashboard";
+import { createNews, saveDraftNews, updateNews, type News, type NewsInput } from "@/lib/dashboard";
 import { newsSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
 import {
   emptyMedia,
@@ -20,21 +21,18 @@ import {
   type MediaDraft,
 } from "@/lib/news-media";
 
-/** Sur l'accueil, seuls le titre et le contenu se saisissent : auteur et statut sont posés par le code. */
-const draftSchema = newsSchema.pick({ title: true, body: true });
-
-export type NewsDraftDialogState = { mode: "create" } | { mode: "edit"; news: News };
+export type NewsDialogState = { mode: "create" } | { mode: "edit"; news: News };
 
 const FOCUSABLE =
   "a[href],button:not([disabled]),input:not([disabled]):not([type=file]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 
 /**
- * État de la fenêtre, remonté dans le parent : le bouton « CRÉER UNE ACTUALITÉ » est rendu à droite du
- * titre de la section, hors de NewsSection. `from` est l'élément qui ouvre la fenêtre : le focus lui est
- * rendu à la fermeture, s'il existe encore.
+ * État de la fenêtre, remonté dans le parent : le bouton de création peut être rendu hors du composant
+ * qui affiche la liste. `from` est l'élément qui ouvre la fenêtre (à défaut, l'élément qui a le focus) :
+ * le focus lui est rendu à la fermeture, s'il existe encore.
  */
-export function useNewsDraftDialog() {
-  const [state, setState] = useState<NewsDraftDialogState | null>(null);
+export function useNewsDialog() {
+  const [state, setState] = useState<NewsDialogState | null>(null);
   const opener = useRef<HTMLElement | null>(null);
   const restore = useRef(false);
 
@@ -46,14 +44,19 @@ export function useNewsDraftDialog() {
     if (el?.isConnected) el.focus();
   }, [state]);
 
+  const remember = (from?: HTMLElement | null) => {
+    opener.current =
+      from ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  };
+
   return {
     state,
-    openCreate: (from: HTMLElement) => {
-      opener.current = from;
+    openCreate: (from?: HTMLElement | null) => {
+      remember(from);
       setState({ mode: "create" });
     },
-    openEdit: (news: News, from: HTMLElement) => {
-      opener.current = from;
+    openEdit: (news: News, from?: HTMLElement | null) => {
+      remember(from);
       setState({ mode: "edit", news });
     },
     close: () => {
@@ -63,25 +66,40 @@ export function useNewsDraftDialog() {
   };
 }
 
-export type NewsDraftDialogControl = ReturnType<typeof useNewsDraftDialog>;
+export type NewsDialogControl = ReturnType<typeof useNewsDialog>;
 
-/** Fenêtre de création et de modification d'un brouillon d'actualité (statut toujours « brouillon »). */
-export function NewsDraftDialog({
+/**
+ * Fenêtre « Nouvelle actualité » / « Modifier l'actualité », partagée par la page de gestion des
+ * actualités et l'accueil.
+ * - `canPublish` (admin) : createNews / updateNews, statut Brouillon ou Publiée.
+ * - sinon (manager) : saveDraftNews, statut verrouillé sur Brouillon, `myEmail` posé comme auteur
+ *   technique (author_email) ; la base refuse tout autre brouillon que les siens.
+ * `defaultAuthor` préremplit le champ Auteur en création ; en modification, il reprend celui de l'actualité.
+ */
+export function NewsFormDialog({
   state,
-  myName,
+  canPublish,
+  defaultAuthor,
   myEmail,
   onClose,
 }: {
-  state: NewsDraftDialogState;
-  myName: string;
+  state: NewsDialogState;
+  canPublish: boolean;
+  defaultAuthor: string;
+  /** Utilisé seulement par les managers (saveDraftNews). */
   myEmail: string;
   onClose: () => void;
 }) {
   const editing = state.mode === "edit" ? state.news : null;
   const qc = useQueryClient();
   const root = useRef<HTMLDivElement>(null);
-  const [title, setTitle] = useState(editing?.title ?? "");
-  const [body, setBody] = useState(editing?.body ?? "");
+  const helpId = useId();
+  const [form, setForm] = useState<NewsInput>(() => ({
+    title: editing?.title ?? "",
+    body: editing?.body ?? "",
+    author: editing ? (editing.author ?? "") : defaultAuthor,
+    status: canPublish && editing ? editing.status : "brouillon",
+  }));
   const [media, setMedia] = useState<MediaDraft>(() =>
     editing ? mediaFromNews(editing) : emptyMedia(),
   );
@@ -89,9 +107,24 @@ export function NewsDraftDialog({
   const [showLinkErrs, setShowLinkErrs] = useState(false);
 
   const save = useMutation({
-    mutationFn: saveDraftNews,
+    mutationFn: (input: NewsInput) => {
+      if (!canPublish) {
+        return saveDraftNews({
+          id: editing?.id,
+          title: input.title,
+          body: input.body,
+          author: input.author,
+          author_email: myEmail,
+          links: input.links ?? [],
+          media,
+        });
+      }
+      return editing ? updateNews(editing.id, input, media) : createNews(input, media);
+    },
     onSuccess: () => {
-      toast.success("Brouillon enregistré");
+      toast.success(
+        !canPublish ? "Brouillon enregistré" : editing ? "Actualité modifiée" : "Actualité créée",
+      );
       qc.invalidateQueries({ queryKey: ["news"] });
       onClose();
     },
@@ -128,48 +161,37 @@ export function NewsDraftDialog({
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const res = validate(draftSchema, { title, body });
+    const res = validate(newsSchema, canPublish ? form : { ...form, status: "brouillon" });
     if (!res.ok) {
       setErrors(res.errors);
       return;
     }
     setErrors({});
     setShowLinkErrs(true);
-    if (Object.keys(linkErrors(media.links)).length) {
-      toast.error("Corrige les liens invalides avant d'enregistrer.");
-      return;
-    }
-    save.mutate({
-      id: editing?.id,
-      title: res.data.title,
-      body: res.data.body,
-      author: myName,
-      author_email: myEmail,
-      links: toNewsLinks(media.links),
-      media,
-    });
+    if (Object.keys(linkErrors(media.links)).length) return;
+    save.mutate({ ...res.data, links: toNewsLinks(media.links) });
   }
 
   return (
     <div ref={root} onKeyDown={onKeyDown}>
-      <Modal title={editing ? "Modifier le brouillon" : "Nouvelle actualité"} onClose={onClose}>
+      <Modal title={editing ? "Modifier l'actualité" : "Nouvelle actualité"} onClose={onClose}>
         <form onSubmit={submit} className="space-y-sm" noValidate>
           <ErrorSummary errors={errors} />
           <Field label="Titre" error={errors.title}>
             <TextInput
               aria-label="Titre"
-              value={title}
+              value={form.title}
               maxLength={160}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
             />
           </Field>
           <Field label="Contenu" error={errors.body}>
             <TextArea
               aria-label="Contenu"
               rows={5}
-              value={body}
+              value={form.body}
               maxLength={5000}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={(e) => setForm({ ...form, body: e.target.value })}
             />
           </Field>
           <Field label="Image et liens">
@@ -178,8 +200,33 @@ export function NewsDraftDialog({
               onChange={setMedia}
               linkErrs={showLinkErrs ? linkErrors(media.links) : {}}
               disabled={save.isPending}
-              title={title}
+              title={form.title}
             />
+          </Field>
+          <Field label="Auteur" error={errors.author}>
+            <TextInput
+              aria-label="Auteur"
+              value={form.author}
+              maxLength={80}
+              onChange={(e) => setForm({ ...form, author: e.target.value })}
+            />
+          </Field>
+          <Field label="Statut" error={errors.status}>
+            <Select
+              aria-label="Statut"
+              aria-describedby={canPublish ? undefined : helpId}
+              value={form.status}
+              disabled={!canPublish}
+              onChange={(e) => setForm({ ...form, status: e.target.value })}
+            >
+              <option value="brouillon">Brouillon</option>
+              {canPublish && <option value="publiée">Publiée</option>}
+            </Select>
+            {!canPublish && (
+              <p id={helpId} className="text-body-sm text-on-surface-variant">
+                Les managers enregistrent des brouillons. Un admin les publie.
+              </p>
+            )}
           </Field>
           <FormActions pending={save.isPending} pendingLabel="Enregistrement…" onCancel={onClose} />
         </form>

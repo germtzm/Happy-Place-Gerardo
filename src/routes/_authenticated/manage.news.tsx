@@ -2,29 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-  ConfirmDelete,
-  ErrorSummary,
-  Field,
-  FormActions,
-  Modal,
-  RowActions,
-  Select,
-  TextArea,
-  TextInput,
-} from "@/components/manage/crud-ui";
-import { newsSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
-import {
-  createNews,
-  deleteNews,
-  fetchAllNews,
-  timeAgo,
-  updateNews,
-  type News,
-  type NewsInput,
-} from "@/lib/dashboard";
-import { NewsImage, NewsLinks, NewsMediaEditor } from "@/components/news-media";
-import { emptyMedia, linkErrors, mediaFromNews, toNewsLinks, type MediaDraft } from "@/lib/news-media";
+import { ConfirmDelete, RowActions } from "@/components/manage/crud-ui";
+import { NewsFormDialog, useNewsDialog } from "@/components/home/news-draft-dialog";
+import { deleteNews, fetchAllNews, timeAgo, type News } from "@/lib/dashboard";
+import { NewsImage, NewsLinks } from "@/components/news-media";
 
 export const Route = createFileRoute("/_authenticated/manage/news")({
   head: () => ({
@@ -45,31 +26,14 @@ const newsStatusLabels: Record<string, string> = {
   publiée: "Publiée",
 };
 
-const empty: NewsInput = { title: "", body: "", author: "Direction Recrutement", status: "brouillon" };
-
 function ManageNews() {
   const qc = useQueryClient();
-  const [form, setForm] = useState<NewsInput | null>(null);
-  const [editing, setEditing] = useState<News | null>(null);
-  const [errors, setErrors] = useState<FieldErrors>({});
+  const dialog = useNewsDialog();
   const [toDelete, setToDelete] = useState<News | null>(null);
-  const [media, setMedia] = useState<MediaDraft>(emptyMedia);
-  const [showLinkErrs, setShowLinkErrs] = useState(false);
 
   const list = useQuery({ queryKey: ["news", "all"], queryFn: fetchAllNews, retry: false });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["news"] });
   const onError = (e: unknown) => toast.error((e as Error).message);
-
-  const save = useMutation({
-    mutationFn: (input: NewsInput) =>
-      editing ? updateNews(editing.id, input, media) : createNews(input, media),
-    onSuccess: () => {
-      toast.success(editing ? "Actualité modifiée" : "Actualité créée");
-      close();
-      invalidate();
-    },
-    onError,
-  });
 
   const remove = useMutation({
     mutationFn: (n: News) => deleteNews(n.id, n.image_path),
@@ -81,28 +45,6 @@ function ManageNews() {
     onError,
   });
 
-  function close() {
-    setForm(null);
-    setEditing(null);
-    setErrors({});
-    setMedia(emptyMedia());
-    setShowLinkErrs(false);
-  }
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form) return;
-    const res = validate(newsSchema, form);
-    if (!res.ok) {
-      setErrors(res.errors);
-      return;
-    }
-    setErrors({});
-    setShowLinkErrs(true);
-    if (Object.keys(linkErrors(media.links)).length) return;
-    save.mutate({ ...res.data, links: toNewsLinks(media.links) });
-  }
-
   return (
     <section className="space-y-md">
       <div className="flex items-center justify-between">
@@ -110,13 +52,7 @@ function ManageNews() {
           Actualités ({list.data?.length ?? 0})
         </h2>
         <button
-          onClick={() => {
-            setEditing(null);
-            setErrors({});
-            setMedia(emptyMedia());
-            setShowLinkErrs(false);
-            setForm({ ...empty });
-          }}
+          onClick={(e) => dialog.openCreate(e.currentTarget)}
           className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md"
         >
           + NOUVELLE ACTUALITÉ
@@ -143,21 +79,7 @@ function ManageNews() {
                  {newsStatusLabels[n.status] ?? n.status} • {n.author} • {timeAgo(n.created_at)}
               </p>
             </div>
-            <RowActions
-              onEdit={() => {
-                setEditing(n);
-                setErrors({});
-                setMedia(mediaFromNews(n));
-                setShowLinkErrs(false);
-                setForm({
-                  title: n.title,
-                  body: n.body ?? "",
-                  author: n.author ?? "",
-                  status: n.status,
-                });
-              }}
-              onDelete={() => setToDelete(n)}
-            />
+            <RowActions onEdit={() => dialog.openEdit(n)} onDelete={() => setToDelete(n)} />
           </article>
         ))}
         {list.data?.length === 0 && (
@@ -165,53 +87,14 @@ function ManageNews() {
         )}
       </div>
 
-      {form && (
-        <Modal title={editing ? "Modifier l'actualité" : "Nouvelle actualité"} onClose={close}>
-          <form onSubmit={submit} className="space-y-sm" noValidate>
-            <ErrorSummary errors={errors} />
-            <Field label="Titre" error={errors.title}>
-              <TextInput
-                value={form.title}
-                maxLength={160}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-              />
-            </Field>
-            <Field label="Contenu" error={errors.body}>
-              <TextArea
-                rows={5}
-                value={form.body}
-                maxLength={5000}
-                onChange={(e) => setForm({ ...form, body: e.target.value })}
-              />
-            </Field>
-            <Field label="Image et liens">
-              <NewsMediaEditor
-                value={media}
-                onChange={setMedia}
-                linkErrs={showLinkErrs ? linkErrors(media.links) : {}}
-                disabled={save.isPending}
-                title={form.title}
-              />
-            </Field>
-            <Field label="Auteur" error={errors.author}>
-              <TextInput
-                value={form.author}
-                maxLength={80}
-                onChange={(e) => setForm({ ...form, author: e.target.value })}
-              />
-            </Field>
-            <Field label="Statut" error={errors.status}>
-              <Select
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-              >
-                <option value="brouillon">Brouillon</option>
-                <option value="publiée">Publiée</option>
-              </Select>
-            </Field>
-            <FormActions pending={save.isPending} onCancel={close} />
-          </form>
-        </Modal>
+      {dialog.state && (
+        <NewsFormDialog
+          state={dialog.state}
+          canPublish
+          defaultAuthor="Direction Recrutement"
+          myEmail=""
+          onClose={dialog.close}
+        />
       )}
 
       {toDelete && (

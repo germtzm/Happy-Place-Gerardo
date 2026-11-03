@@ -4,7 +4,7 @@ import { NewsImage, NewsLinks } from "@/components/news-media";
 import { deleteDraftNews, fetchNews, publishDraftNews, timeAgo, type News } from "@/lib/dashboard";
 import { CardActionButton } from "./card-action-button";
 import { Icon } from "./icon";
-import { NewsDraftDialog, type NewsDraftDialogControl } from "./news-draft-dialog";
+import { NewsFormDialog, type NewsDialogControl } from "./news-draft-dialog";
 
 export function NewsSection({
   isAdmin,
@@ -19,8 +19,8 @@ export function NewsSection({
   myName: string;
   myEmail: string;
   onRead: (n: News) => void;
-  /** État de la fenêtre de brouillon, tenu par le parent (le bouton de création est dans le titre de section). */
-  newsDialog: NewsDraftDialogControl;
+  /** État de la fenêtre d'actualité, tenu par le parent (le bouton de création est dans le titre de section). */
+  newsDialog: NewsDialogControl;
 }) {
   const qc = useQueryClient();
   const news = useQuery({ queryKey: ["news"], queryFn: fetchNews, retry: false });
@@ -59,9 +59,10 @@ export function NewsSection({
         </span>
       </div>
       {canWriteNews && newsDialog.state && (
-        <NewsDraftDialog
+        <NewsFormDialog
           state={newsDialog.state}
-          myName={myName}
+          canPublish={isAdmin}
+          defaultAuthor={myName}
           myEmail={myEmail}
           onClose={newsDialog.close}
         />
