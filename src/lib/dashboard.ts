@@ -535,6 +535,21 @@ export async function markNotificationRead(id: string) {
   if (error) throw error;
 }
 
+/**
+ * Marque comme lues toutes les notifications non lues du connecté (la RLS limite l'update à ses lignes,
+ * sans filtre par identifiant ni limite de 20). Seule read_at change. Retourne le nombre de lignes
+ * marquées ; 0, sans erreur, si rien n'était non lu.
+ */
+export async function markAllNotificationsRead(): Promise<number> {
+  const { data, error } = await db
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .is("read_at", null)
+    .select("id");
+  if (error) throw error;
+  return data?.length ?? 0;
+}
+
 /* ============================================================
  * Récapitulatif du manager (B04) — préférences d'envoi
  * ========================================================== */

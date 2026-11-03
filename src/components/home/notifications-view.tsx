@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { RecapCard } from "./recap-card";
 import { usePendingNotifications } from "./use-pending-notifications";
 import {
+  markAllNotificationsRead,
   markNotificationRead,
   notificationExcerpt,
   notificationTitle,
@@ -43,6 +44,17 @@ export function NotificationsView({
     onError: (e: unknown) => toast.error((e as Error).message),
   });
 
+  const markAllRead = useMutation({
+    mutationFn: markAllNotificationsRead,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["notifications"] });
+      toast.success("Notifications marquées comme lues.");
+      // Le bouton disparaît : le focus revient au titre plutôt que de se perdre.
+      titleRef.current?.focus();
+    },
+    onError: (e: unknown) => toast.error((e as Error).message),
+  });
+
   function openSubmission(n: NotificationItem) {
     if (!n.submission) return;
     if (!n.read_at) markRead.mutate(n.id);
@@ -68,9 +80,22 @@ export function NotificationsView({
         >
           Notifications
         </h1>
-        <p aria-live="polite" className="font-label-sm text-label-sm uppercase text-[#68686D]">
-          {unreadCount} NON LUE{unreadCount > 1 ? "S" : ""}
-        </p>
+        <div className="flex flex-wrap items-center gap-sm">
+          <p aria-live="polite" className="font-label-sm text-label-sm uppercase text-[#68686D]">
+            {unreadCount} NON LUE{unreadCount > 1 ? "S" : ""}
+          </p>
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              disabled={markAllRead.isPending}
+              aria-busy={markAllRead.isPending}
+              onClick={() => markAllRead.mutate()}
+              className="inline-flex min-h-[44px] items-center rounded-[8px] border border-primary px-md font-label-md text-label-md uppercase text-primary hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
+            >
+              TOUT MARQUER COMME LU
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Manager : deux cartes de même hauteur (Notifications, puis Récapitulatif) ; à 375 px elles
