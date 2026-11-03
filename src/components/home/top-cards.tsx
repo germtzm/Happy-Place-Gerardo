@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
-import { toast } from "sonner";
+import { useContext, type ReactNode } from "react";
 import {
   deltaText,
   fetchBlockers,
@@ -9,6 +8,7 @@ import {
   timeAgo,
   type News,
 } from "@/lib/dashboard";
+import { FullViewContext, type FullView } from "./full-view-context";
 import { Icon } from "./icon";
 import { formatMetric, metricLabel, trendText } from "./metrics-format";
 
@@ -20,25 +20,36 @@ const cardCls =
 const titleCls =
   "font-headline-sm text-headline-sm text-primary border-b border-[#CDCDD1] pb-xs mb-sm";
 
-function SeeAll({ label }: { label: string }) {
+function SeeAll({ label, view }: { label: string; view: FullView }) {
+  const openFullView = useContext(FullViewContext);
   return (
     <button
       type="button"
-      title="Bientôt disponible"
-      onClick={() => toast.info("Bientôt disponible")}
-      className="mt-auto pt-sm self-start font-label-sm text-label-sm uppercase text-primary underline-offset-2 hover:underline"
+      id={`see-all-${view}`}
+      onClick={() => openFullView(view)}
+      className="mt-auto inline-flex min-h-[44px] items-center self-start pt-sm font-label-sm text-label-sm uppercase text-primary underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
       {label} →
     </button>
   );
 }
 
-function Card({ title, children, seeAll }: { title: string; children: ReactNode; seeAll: string }) {
+function Card({
+  title,
+  children,
+  seeAll,
+  view,
+}: {
+  title: string;
+  children: ReactNode;
+  seeAll: string;
+  view: FullView;
+}) {
   return (
     <section className={cardCls}>
       <h2 className={titleCls}>{title}</h2>
       <div className="space-y-xs">{children}</div>
-      <SeeAll label={seeAll} />
+      <SeeAll label={seeAll} view={view} />
     </section>
   );
 }
@@ -54,7 +65,7 @@ export function HomeTopCards({ onReadNews }: { onReadNews: (n: News) => void }) 
 
   return (
     <div className="grid grid-cols-1 gap-md md:grid-cols-[3fr_2fr_2fr]">
-      <Card title="Actualités du cabinet" seeAll="VOIR TOUTES LES ACTUALITÉS">
+      <Card title="Actualités du cabinet" seeAll="VOIR TOUTES LES ACTUALITÉS" view="news">
         {news.isError && (
           <p className="text-body-sm text-error">Les actualités sont indisponibles.</p>
         )}
@@ -88,7 +99,7 @@ export function HomeTopCards({ onReadNews }: { onReadNews: (n: News) => void }) 
         ))}
       </Card>
 
-      <Card title="Points bloquants" seeAll="VOIR TOUS LES POINTS BLOQUANTS">
+      <Card title="Points bloquants" seeAll="VOIR TOUS LES POINTS BLOQUANTS" view="blockers">
         {blockers.isError && (
           <p className="text-body-sm text-error">Les points bloquants sont indisponibles.</p>
         )}
@@ -124,7 +135,7 @@ export function HomeTopCards({ onReadNews }: { onReadNews: (n: News) => void }) 
         })}
       </Card>
 
-      <Card title="Indicateurs clés" seeAll="VOIR TOUS LES INDICATEURS">
+      <Card title="Indicateurs clés" seeAll="VOIR TOUS LES INDICATEURS" view="metrics">
         {metrics.isError && (
           <p className="text-body-sm text-error">Les indicateurs sont indisponibles.</p>
         )}

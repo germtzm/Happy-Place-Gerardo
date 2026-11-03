@@ -12,6 +12,8 @@ import { NewsReader } from "@/components/news-reader";
 import { BlockerArchive } from "@/components/dashboard-extras";
 import { AdminHome } from "@/components/home/admin-home";
 import { CollaborateurHome } from "@/components/home/collaborateur-home";
+import { FullViewContext, type FullView } from "@/components/home/full-view-context";
+import { BlockersListView, MetricsListView, NewsListView } from "@/components/home/full-views";
 import { HomeHeader } from "@/components/home/home-header";
 import { ManagerHome } from "@/components/home/manager-home";
 import { NotificationsView } from "@/components/home/notifications-view";
@@ -93,6 +95,16 @@ function ManagerSpace() {
   const [readingNews, setReadingNews] = useState<News | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // Vue complète ouverte depuis les cartes de l'accueil (une seule à la fois, exclusive de Notifications).
+  const [fullView, setFullView] = useState<FullView | null>(null);
+  const lastFullView = useRef<FullView | null>(null);
+  // Au retour d'une vue complète, le focus revient sur son lien « VOIR TOUS… ».
+  useEffect(() => {
+    if (lastFullView.current && !fullView) {
+      document.getElementById(`see-all-${lastFullView.current}`)?.focus();
+    }
+    lastFullView.current = fullView;
+  }, [fullView]);
   const wasNotificationsOpen = useRef(false);
   // Au retour de la vue Notifications, le focus revient sur la cloche qui réapparaît.
   useEffect(() => {
@@ -193,10 +205,30 @@ function ManagerSpace() {
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
       <BrandHeader
         email={myEmail}
-        onOpenNotifications={() => setNotificationsOpen(true)}
+        onOpenNotifications={() => {
+          setFullView(null);
+          setNotificationsOpen(true);
+        }}
         hideBell={notificationsOpen}
       />
       <main className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
+        {fullView === "news" && (
+          <NewsListView
+            isAdmin={isAdmin}
+            onBack={() => setFullView(null)}
+            onReadNews={setReadingNews}
+          />
+        )}
+        {fullView === "blockers" && (
+          <BlockersListView
+            isAdmin={isAdmin}
+            onBack={() => setFullView(null)}
+            onOpenArchive={() => setArchiveOpen(true)}
+          />
+        )}
+        {fullView === "metrics" && (
+          <MetricsListView isAdmin={isAdmin} onBack={() => setFullView(null)} />
+        )}
         {notificationsOpen && (
           <NotificationsView
             email={myEmail}
@@ -206,7 +238,7 @@ function ManagerSpace() {
           />
         )}
         {/* L'accueil reste monté (masqué) pendant la vue Notifications : l'onglet actif est conservé. */}
-        <div hidden={notificationsOpen} className="space-y-md">
+        <div hidden={notificationsOpen || fullView !== null} className="space-y-md">
           <HomeHeader
             email={email}
             roleLabel={roleLabel}
@@ -226,17 +258,24 @@ function ManagerSpace() {
             }}
           />
 
-          <Home
-            role={role}
-            email={myEmail}
-            managerTeams={myTeams.data ?? []}
-            myName={myName}
-            onReadNews={setReadingNews}
-            onReadSubmission={setReading}
-            onReject={startReject}
-            onApprove={(s) => review.mutate({ id: s.id, status: "validée" })}
-            onOpenArchive={() => setArchiveOpen(true)}
-          />
+          <FullViewContext.Provider
+            value={(v) => {
+              setNotificationsOpen(false);
+              setFullView(v);
+            }}
+          >
+            <Home
+              role={role}
+              email={myEmail}
+              managerTeams={myTeams.data ?? []}
+              myName={myName}
+              onReadNews={setReadingNews}
+              onReadSubmission={setReading}
+              onReject={startReject}
+              onApprove={(s) => review.mutate({ id: s.id, status: "validée" })}
+              onOpenArchive={() => setArchiveOpen(true)}
+            />
+          </FullViewContext.Provider>
         </div>
       </main>
       <BlockerArchive open={archiveOpen} onClose={() => setArchiveOpen(false)} />
