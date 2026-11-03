@@ -8,8 +8,9 @@ import { SideNav, type SideNavItem } from "./side-nav";
 export type TitleAside = ReactNode | ((focusTitle: () => void) => ReactNode);
 
 /**
- * Page à menu latéral : le menu collé au bord gauche de la fenêtre (au-dessus du contenu en dessous de
- * md), la section active à droite sous son titre, à largeur maximale centrée dans l'espace restant. Le
+ * Page à menu latéral : le menu collé au bord gauche de la fenêtre (sous md, un bouton « Menu » au-dessus
+ * du contenu déroule la liste), la section active à droite sous son titre, à largeur maximale centrée
+ * dans l'espace restant. Le
  * composant doit être posé hors d'un conteneur centré, sinon le rail ne touche pas le bord. Un lien
  * d'évitement mène au titre ; à chaque changement de section, le focus va au titre (tabIndex -1).
  * Pas de focus au premier affichage.

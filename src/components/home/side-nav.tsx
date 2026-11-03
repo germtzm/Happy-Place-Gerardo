@@ -1,4 +1,5 @@
-import { useRef, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { menuButtonLabel, menuEntries } from "@/lib/mobile-menu";
 import { nextNavIndex } from "@/lib/side-nav";
 import { Icon } from "./icon";
 
@@ -57,12 +58,113 @@ function CountBadge({ item, className = "" }: { item: SideNavItem; className?: s
 const separatorCls = "h-auto w-px self-stretch bg-[#CDCDD1] md:h-px md:w-full md:self-auto";
 
 /**
- * Menu latéral : rail de 96 px collé au bord gauche à partir de md (au-dessous, les entrées passent à la
- * ligne au-dessus du contenu). Le groupe du haut défile, le groupe du bas reste épinglé. Chaque entrée
- * est un bouton, une tabulation chacune ; les flèches haut et bas, Début et Fin déplacent le focus sans
- * activer.
+ * Sous md : bouton « Menu : section active » pleine largeur, qui déroule le même menu en liste verticale
+ * (icône, libellé, compteur). Ce n'est pas une fenêtre modale : pas de piège de focus. Replié, le bloc est
+ * `hidden` (hors de la tabulation) ; Échap le referme et rend le focus au bouton ; choisir une entrée le
+ * referme (pour une section, le focus va ensuite au titre, voir SideNavLayout).
  */
-export function SideNav({ items, bottomItems = [], activeId, onChange }: Props) {
+function MobileMenu({ items, bottomItems = [], activeId, onChange }: Props) {
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
+  const active = [...items, ...bottomItems].find((i) => i.id === activeId && !i.onSelect);
+
+  // Un changement de section venu d'ailleurs (la cloche du bandeau) referme le menu.
+  useEffect(() => {
+    setOpen(false);
+  }, [activeId]);
+
+  function choose(item: SideNavItem) {
+    setOpen(false);
+    if (item.onSelect) {
+      item.onSelect();
+      button.current?.focus();
+    } else {
+      onChange(item.id);
+      // Même section : rien ne déplace le focus vers le titre, le bouton le garde.
+      if (item.id === activeId) button.current?.focus();
+    }
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLElement>) {
+    if (e.key !== "Escape" || !open) return;
+    e.preventDefault();
+    setOpen(false);
+    button.current?.focus();
+  }
+
+  return (
+    <nav
+      aria-label="Sections de l'accueil"
+      onKeyDown={onKeyDown}
+      className="border-b border-[#CDCDD1] bg-white md:hidden"
+    >
+      <button
+        ref={button}
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((o) => !o)}
+        className="flex min-h-[44px] w-full items-center gap-sm px-sm py-xs text-left font-label-md text-label-md text-[#28282D] hover:bg-[#EEEDEA] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#28282D]"
+      >
+        <Icon name="menu" className="shrink-0" />
+        <span className="min-w-0 flex-1 wrap-anywhere">{menuButtonLabel(active?.label)}</span>
+        <Icon name={open ? "expand_less" : "expand_more"} className="shrink-0" />
+      </button>
+      <div id={panelId} hidden={!open} className="border-t border-[#CDCDD1]">
+        <ul className="space-y-[4px] px-[6px] py-[6px]">
+          {menuEntries(items, bottomItems).map((entry) => {
+            if (entry.type === "separator") {
+              return (
+                <li key={entry.key} aria-hidden="true" className="my-[2px] h-px bg-[#CDCDD1]" />
+              );
+            }
+            const item = entry.item;
+            const isActive = !item.onSelect && item.id === activeId;
+            return (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  aria-current={isActive ? "page" : undefined}
+                  aria-label={item.ariaLabel}
+                  onClick={() => choose(item)}
+                  className={`flex min-h-[44px] w-full items-center gap-sm rounded-[8px] px-sm py-xs text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#28282D] focus-visible:ring-offset-2 ${
+                    isActive ? "bg-[#28282D] text-[#F9F8F5]" : "text-[#55555A] hover:bg-[#EEEDEA]"
+                  }`}
+                >
+                  {item.icon && <Icon name={item.icon} className="shrink-0" />}
+                  <span className="min-w-0 flex-1 font-label-md text-label-md wrap-anywhere">
+                    {item.label}
+                  </span>
+                  {hasCount(item) && (
+                    <CountBadge item={item} className="shrink-0 whitespace-nowrap" />
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </nav>
+  );
+}
+
+/**
+ * Menu latéral : rail de 96 px collé au bord gauche à partir de md ; au-dessous, un bouton « Menu » déroule
+ * la liste (voir MobileMenu). Dans le rail, le groupe du haut défile, le groupe du bas reste épinglé.
+ * Chaque entrée est un bouton, une tabulation chacune ; les flèches haut et bas, Début et Fin déplacent
+ * le focus sans activer.
+ */
+export function SideNav(props: Props) {
+  return (
+    <>
+      <MobileMenu {...props} />
+      <Rail {...props} />
+    </>
+  );
+}
+
+function Rail({ items, bottomItems = [], activeId, onChange }: Props) {
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const ids = [...items, ...bottomItems].map((i) => i.id);
 
@@ -115,7 +217,7 @@ export function SideNav({ items, bottomItems = [], activeId, onChange }: Props) 
     <nav
       aria-label="Sections de l'accueil"
       onKeyDown={onKeyDown}
-      className="flex shrink-0 flex-row flex-wrap items-stretch border-b border-[#CDCDD1] bg-white md:sticky md:top-[var(--home-header-h,4rem)] md:h-[calc(100dvh-var(--home-header-h,4rem))] md:w-[96px] md:flex-col md:flex-nowrap md:self-start md:overflow-hidden md:border-b-0 md:border-r"
+      className="hidden shrink-0 items-stretch border-[#CDCDD1] bg-white md:sticky md:top-[var(--home-header-h,4rem)] md:flex md:h-[calc(100dvh-var(--home-header-h,4rem))] md:w-[96px] md:flex-col md:flex-nowrap md:self-start md:overflow-hidden md:border-r"
     >
       <ul className="flex flex-wrap gap-[4px] px-[6px] py-[6px] md:min-h-0 md:flex-1 md:flex-col md:flex-nowrap md:overflow-y-auto md:overflow-x-hidden">
         {items.flatMap((item, i) =>
