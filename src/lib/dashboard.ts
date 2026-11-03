@@ -3,6 +3,12 @@ import type { Database, Json } from "@/integrations/supabase/types";
 import { applyNewsImage, removeNewsImageFile, type MediaDraft, type NewsLink } from "@/lib/news-media";
 import { supabase } from "@/integrations/supabase/client";
 import type { AttachmentChange } from "@/lib/own-submission";
+import {
+  documentFileName,
+  hasDocuments,
+  safeDocumentTitle,
+  type DownloadRow,
+} from "@/lib/departure-progress";
 import { formatDepartureDay, sortTeamDepartures, type TeamDeparture } from "@/lib/team-departures";
 
 export const db = supabase;
@@ -988,6 +994,10 @@ export type DepartureNotice = {
 /** Un départ est urgent quand un rappel a été envoyé. */
 export const isUrgentNotice = (n: DepartureNotice) => !!n.reminder_at;
 
+/**
+ * Avis « à traiter » (compteurs de l'accueil) : ouverts, pas encore tous téléchargés, et avec au moins
+ * un document. Un avis sans document n'est jamais à traiter.
+ */
 export async function fetchMyDepartureNotices(email: string): Promise<DepartureNotice[]> {
   const { data, error } = await supabase
     .from("departure_notices")
@@ -997,7 +1007,76 @@ export async function fetchMyDepartureNotices(email: string): Promise<DepartureN
     .is("downloaded_at", null)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as unknown as DepartureNotice[];
+  return ((data ?? []) as unknown as DepartureNotice[]).filter((n) => hasDocuments(n.documents));
+}
+
+export type DepartureNoticeWithDownloads = DepartureNotice & { downloads: DownloadRow[] };
+
+// Les types générés ne connaissent pas encore cette table : appel typé à la main.
+type DownloadsTableClient = {
+  from: (table: "departure_notice_downloads") => {
+    select: (columns: string) => {
+      in: (
+        column: string,
+        values: string[],
+      ) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+    };
+  };
+};
+
+/**
+ * Panneau des départs : tous les avis ouverts du destinataire (téléchargés ou non, avec ou sans
+ * document), chacun avec ses téléchargements enregistrés (la RLS limite la lecture au destinataire).
+ */
+export async function fetchMyDepartureNoticeProgress(
+  email: string,
+): Promise<DepartureNoticeWithDownloads[]> {
+  const { data, error } = await supabase
+    .from("departure_notices")
+    .select("id, departing_label, departure_date, kind, documents, created_at, reminder_at")
+    .eq("recipient_email", email.toLowerCase())
+    .is("closed_at", null)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const notices = (data ?? []) as unknown as DepartureNotice[];
+  const ids = notices.filter((n) => hasDocuments(n.documents)).map((n) => n.id);
+  let rows: (DownloadRow & { notice_id: string })[] = [];
+  if (ids.length > 0) {
+    const res = await (supabase as unknown as DownloadsTableClient)
+      .from("departure_notice_downloads")
+      .select("notice_id, doc_path, downloaded_at")
+      .in("notice_id", ids);
+    if (res.error) throw new Error(res.error.message);
+    rows = (res.data ?? []) as (DownloadRow & { notice_id: string })[];
+  }
+  return notices.map((n) => ({
+    ...n,
+    downloads: rows
+      .filter((r) => r.notice_id === n.id)
+      .map(({ doc_path, downloaded_at }) => ({ doc_path, downloaded_at })),
+  }));
+}
+
+export type DownloadRecord = {
+  done_count: number;
+  total_count: number;
+  is_complete: boolean;
+  completed_at: string | null;
+};
+
+/** Enregistre des documents comme téléchargés (à appeler seulement après un téléchargement réussi). */
+export async function recordDepartureDownloads(
+  noticeId: string,
+  paths: string[],
+): Promise<DownloadRecord> {
+  const { data, error } = await rpcUntyped<DownloadRecord[] | DownloadRecord>(
+    "record_departure_downloads",
+    { _notice_id: noticeId, _paths: paths },
+  );
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("L'enregistrement du téléchargement n'a rien renvoyé.");
+  return row;
 }
 
 // Type, format et tri vivent dans un module pur (sans client Supabase), ré-exportés ici.
@@ -1031,7 +1110,7 @@ export async function downloadDepartureZip(notice: DepartureNotice) {
   for (const d of notice.documents) {
     const { data, error } = await supabase.storage.from("submission-attachments").download(d.path);
     if (error) throw error;
-    const safe = d.excerpt.replace(/[\\/:*?"<>|\n\r]+/g, " ").trim().slice(0, 60) || "document";
+    const safe = safeDocumentTitle(d.excerpt);
     let name = `${d.created_at.slice(0, 10)} - ${safe}.pdf`;
     let i = 2;
     while (used.has(name)) name = `${d.created_at.slice(0, 10)} - ${safe} (${i++}).pdf`;
@@ -1039,12 +1118,24 @@ export async function downloadDepartureZip(notice: DepartureNotice) {
     zip.file(name, data);
   }
   const blob = await zip.generateAsync({ type: "blob" });
+  saveBlob(blob, `documents - ${notice.departing_label}.zip`);
+}
+
+/** Lien local avec attribut download ; le lien objet est libéré après usage. */
+function saveBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `documents - ${notice.departing_label}.zip`;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+/** Télécharge un seul document d'un avis (lecture du fichier, puis lien local). Lève une erreur en cas d'échec. */
+export async function downloadDepartureDocument(d: DepartureDocument) {
+  const { data, error } = await supabase.storage.from("submission-attachments").download(d.path);
+  if (error) throw error;
+  saveBlob(data, documentFileName(d));
 }

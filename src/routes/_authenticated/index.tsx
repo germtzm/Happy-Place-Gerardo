@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -17,10 +17,11 @@ import { CollaborateurHome } from "@/components/home/collaborateur-home";
 import { FullViewContext, type FullView } from "@/components/home/full-view-context";
 import { BlockersListView, MetricsListView, NewsListView } from "@/components/home/full-views";
 import { HomeContext } from "@/components/home/home-context";
-import { HomeHeader } from "@/components/home/home-header";
+import type { SideNavItem } from "@/components/home/side-nav";
 import { SubmissionActionsContext } from "@/components/home/submission-actions-context";
 import { ManagerHome } from "@/components/home/manager-home";
 import type { HomeProps } from "@/components/home/types";
+import { signOut } from "@/lib/auth";
 import { NOTIFICATIONS_ID, OVERVIEW_ID } from "@/lib/side-nav";
 import {
   canDecideSubmission,
@@ -67,6 +68,7 @@ function Home(props: HomeProps) {
 
 function ManagerSpace() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { role, email, user } = Route.useRouteContext();
   const isAdmin = role === "admin";
   const canReview = role === "admin" || role === "manager";
@@ -268,6 +270,31 @@ function ManagerSpace() {
   }
 
   const roleLabel = role === "admin" ? "ADMIN" : role === "manager" ? "MANAGER" : "COLLABORATEUR";
+  // Entrées d'action du bas du rail : elles lancent une fonction au lieu d'ouvrir une section.
+  const railActions: SideNavItem[] = [
+    ...(isAdmin
+      ? [
+          {
+            id: "action-donnees",
+            label: "Données",
+            ariaLabel: "Gérer les données",
+            icon: "database",
+            onSelect: () => {
+              void navigate({ to: "/manage/news" });
+            },
+          },
+        ]
+      : []),
+    {
+      id: "action-deconnexion",
+      label: "Déconnexion",
+      ariaLabel: "Se déconnecter",
+      icon: "logout",
+      onSelect: () => {
+        void signOut();
+      },
+    },
+  ];
   // Un manager ne décide pas de sa propre demande (la base le refuse aussi).
   const readerCanDecide =
     !!reading &&
@@ -319,28 +346,34 @@ function ManagerSpace() {
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
       <BrandHeader
         email={myEmail}
+        home={{ firstName: myFirstName.data, roleLabel }}
         onOpenNotifications={() => {
           setFullView(null);
           setActiveSection(NOTIFICATIONS_ID);
         }}
       />
-      <main className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
-        {fullView === "news" && (
-          <NewsListView isAdmin={isAdmin} onBack={closeFullView} onReadNews={setReadingNews} />
-        )}
-        {fullView === "blockers" && (
-          <BlockersListView
-            isAdmin={isAdmin}
-            onBack={closeFullView}
-            onOpenArchive={() => setArchiveOpen(true)}
-          />
-        )}
-        {fullView === "metrics" && <MetricsListView isAdmin={isAdmin} onBack={closeFullView} />}
-        {/* L'accueil (en-tête et menu) reste monté, masqué seulement pendant une vue « Voir tout » :
-            les panneaux gardent leur état. */}
-        <div hidden={fullView !== null} className="space-y-md">
-          <HomeHeader email={email} roleLabel={roleLabel} isAdmin={isAdmin} />
-
+      <main className="w-full flex-grow">
+        {/* Vues « Voir tout » : dans un conteneur centré à largeur maximale, comme avant. */}
+        <div
+          hidden={fullView === null}
+          className="mx-auto w-full max-w-interface space-y-md p-sm md:p-md"
+        >
+          {fullView === "news" && (
+            <NewsListView isAdmin={isAdmin} onBack={closeFullView} onReadNews={setReadingNews} />
+          )}
+          {fullView === "blockers" && (
+            <BlockersListView
+              isAdmin={isAdmin}
+              onBack={closeFullView}
+              onOpenArchive={() => setArchiveOpen(true)}
+            />
+          )}
+          {fullView === "metrics" && <MetricsListView isAdmin={isAdmin} onBack={closeFullView} />}
+        </div>
+        {/* L'accueil (menu et sections) reste monté, masqué seulement pendant une vue « Voir tout » :
+            les panneaux gardent leur état. Il n'est pas dans un conteneur centré : le rail touche le
+            bord gauche de la fenêtre et la section centre elle-même sa largeur maximale. */}
+        <div hidden={fullView !== null}>
           <HomeContext.Provider
             value={{
               activeId: activeSection,
@@ -348,6 +381,7 @@ function ManagerSpace() {
               onSubmitRequest: startSubmit,
               onExport: () => exportReport.mutate(),
               exporting: exportReport.isPending,
+              railActions,
             }}
           >
             <FullViewContext.Provider value={setFullView}>
