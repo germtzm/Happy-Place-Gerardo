@@ -2,6 +2,7 @@ import { loadBrowserLib } from "@/lib/browser-lib";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { applyNewsImage, removeNewsImageFile, type MediaDraft, type NewsLink } from "@/lib/news-media";
 import { supabase } from "@/integrations/supabase/client";
+import type { AttachmentChange } from "@/lib/own-submission";
 
 export const db = supabase;
 
@@ -400,20 +401,27 @@ export async function createSubmission(input: SubmissionInput) {
 export const ATTACHMENT_BUCKET = "submission-attachments";
 export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
+/** Téléverse un PDF dans le dossier de l'utilisateur (`<id utilisateur>/<uuid>.pdf`). */
+async function uploadSubmissionPdf(file: File): Promise<{ path: string; name: string }> {
+  if (file.type !== "application/pdf") throw new Error("Seuls les fichiers PDF sont acceptés.");
+  if (file.size > MAX_ATTACHMENT_BYTES) throw new Error("Le fichier dépasse 20 Mo.");
+  const { data: u } = await db.auth.getUser();
+  if (!u.user) throw new Error("Session expirée");
+  const path = `${u.user.id}/${crypto.randomUUID()}.pdf`;
+  const { error: upErr } = await db.storage
+    .from(ATTACHMENT_BUCKET)
+    .upload(path, file, { contentType: "application/pdf" });
+  if (upErr) throw upErr;
+  return { path, name: file.name.slice(0, 200) };
+}
+
 export async function submitIdea(input: Omit<SubmissionInput, "status">, file?: File | null) {
   let attachment_path: string | null = null;
   let attachment_name: string | null = null;
   if (file) {
-    if (file.type !== "application/pdf") throw new Error("Seuls les fichiers PDF sont acceptés.");
-    if (file.size > MAX_ATTACHMENT_BYTES) throw new Error("Le fichier dépasse 20 Mo.");
-    const { data: u } = await db.auth.getUser();
-    if (!u.user) throw new Error("Session expirée");
-    attachment_path = `${u.user.id}/${crypto.randomUUID()}.pdf`;
-    attachment_name = file.name.slice(0, 200);
-    const { error: upErr } = await db.storage
-      .from(ATTACHMENT_BUCKET)
-      .upload(attachment_path, file, { contentType: "application/pdf" });
-    if (upErr) throw upErr;
+    const up = await uploadSubmissionPdf(file);
+    attachment_path = up.path;
+    attachment_name = up.name;
   }
   const { error } = await db.from("submissions").insert({
     author_name: input.author_name, team: input.team, content: input.content, status: "en attente",
@@ -719,16 +727,32 @@ export async function deleteSubmission(id: string) {
   if (error) throw error;
 }
 
-/** L'auteur modifie le texte et l'option « masquer mon nom » de sa demande « en attente » (rpc). */
+/**
+ * L'auteur modifie le texte, l'option « masquer mon nom » et, au choix, la pièce jointe de sa demande
+ * « en attente » (rpc). Remplacement : le nouveau PDF est téléversé d'abord. Si l'appel échoue ensuite,
+ * le fichier téléversé reste dans le stockage (seul l'admin peut y supprimer) : fichier orphelin possible.
+ */
 export async function updateMySubmission(input: {
   id: string;
   content: string;
   hide_author: boolean;
+  attachment?: AttachmentChange;
 }) {
+  const change = input.attachment ?? { kind: "keep" as const };
+  let path: string | null = null;
+  let name: string | null = null;
+  if (change.kind === "replace") {
+    const up = await uploadSubmissionPdf(change.file);
+    path = up.path;
+    name = up.name;
+  }
   const { error } = await rpcUntyped<null>("update_my_submission", {
     p_id: input.id,
     p_content: input.content,
     p_hide_author: input.hide_author,
+    p_change_attachment: change.kind !== "keep",
+    p_attachment_path: path,
+    p_attachment_name: name,
   });
   if (error) throw new Error(error.message);
 }

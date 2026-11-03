@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ErrorSummary, Field, FormActions, Modal, TextArea, TextInput } from "@/components/manage/crud-ui";
 import { ideaSchema, rejectionSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
+import { AttachmentLink } from "@/components/attachment-link";
 import { BrandHeader } from "@/components/brand-header";
 import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card";
 import { SubmissionReader } from "@/components/submission-reader";
@@ -33,7 +34,7 @@ import {
   updateMySubmission,
   deleteMySubmission,
 } from "@/lib/dashboard";
-import { canManageOwnSubmission } from "@/lib/own-submission";
+import { attachmentChange, canManageOwnSubmission, pdfFileError } from "@/lib/own-submission";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -181,6 +182,9 @@ function ManagerSpace() {
   // Modifier / supprimer sa propre demande « en attente » (la base refait tous les contrôles).
   const [editing, setEditing] = useState<Submission | null>(null);
   const [deleting, setDeleting] = useState<Submission | null>(null);
+  // Pièce jointe en modification : retrait demandé (annulable) ; le fichier choisi est dans `attachment`.
+  const [removeAttachment, setRemoveAttachment] = useState(false);
+  const [fileKey, setFileKey] = useState(0);
   const afterOwnChange = () => {
     qc.invalidateQueries({ queryKey: ["submissions"] });
     qc.invalidateQueries({ queryKey: ["notifications"] });
@@ -211,11 +215,31 @@ function ManagerSpace() {
     setSubmissionForm(null);
     setSubmissionErrors({});
     setEditing(null);
+    setAttachment(null);
+    setRemoveAttachment(false);
+  }
+
+  // Même contrôle qu'à la création : PDF seulement, 20 Mo au plus, mêmes messages.
+  function pickPdf(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    const problem = f ? pdfFileError(f) : null;
+    if (f && problem) {
+      setSubmissionErrors({ ...submissionErrors, attachment: problem });
+      e.target.value = "";
+      setAttachment(null);
+      return;
+    }
+    const { attachment: _a, ...rest } = submissionErrors;
+    setSubmissionErrors(rest);
+    setAttachment(f);
   }
 
   function startEdit(s: Submission) {
     setReading(null);
     setSubmissionErrors({});
+    setAttachment(null);
+    setRemoveAttachment(false);
+    setFileKey((k) => k + 1);
     setEditing(s);
     setSubmissionForm({
       author_name: s.author_name,
@@ -259,6 +283,7 @@ function ManagerSpace() {
         id: editing.id,
         content: res.data.content,
         hide_author: res.data.hide_author ?? false,
+        attachment: attachmentChange(removeAttachment, attachment),
       });
       return;
     }
@@ -516,9 +541,75 @@ function ManagerSpace() {
               <CharCounter value={submissionForm.content} max={2000} min={5} />
             </Field>
             {editing ? (
-              <p className="text-body-sm text-on-surface-variant">
-                La pièce jointe reste inchangée.
-              </p>
+              <div className="space-y-xs">
+                <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                  Pièce jointe
+                </p>
+                {editing.attachment_path && !removeAttachment && !attachment && (
+                  <div className="flex flex-wrap items-center gap-xs">
+                    <AttachmentLink path={editing.attachment_path} name={editing.attachment_name} />
+                    <button
+                      type="button"
+                      onClick={() => setRemoveAttachment(true)}
+                      className="min-h-[44px] border border-outline px-md font-label-md text-label-md uppercase text-primary hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      Retirer la pièce jointe
+                    </button>
+                  </div>
+                )}
+                {editing.attachment_path && removeAttachment && !attachment && (
+                  <div className="flex flex-wrap items-center gap-xs">
+                    <p className="text-body-sm text-on-surface-variant wrap-anywhere">
+                      La pièce jointe sera retirée à l'enregistrement.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setRemoveAttachment(false)}
+                      className="min-h-[44px] border border-outline px-md font-label-md text-label-md uppercase text-primary hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      Annuler le retrait
+                    </button>
+                  </div>
+                )}
+                {!editing.attachment_path && !attachment && (
+                  <p className="text-body-sm text-on-surface-variant">Aucune pièce jointe.</p>
+                )}
+                {attachment && (
+                  <div className="flex flex-wrap items-center gap-xs">
+                    <p className="text-body-sm text-on-surface-variant wrap-anywhere">
+                      {editing.attachment_path
+                        ? `Remplacera la pièce jointe actuelle : ${attachment.name}`
+                        : `Sera ajoutée : ${attachment.name}`}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAttachment(null);
+                        setFileKey((k) => k + 1);
+                      }}
+                      className="min-h-[44px] border border-outline px-md font-label-md text-label-md uppercase text-primary hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      Ne pas remplacer
+                    </button>
+                  </div>
+                )}
+                <Field
+                  label={
+                    editing.attachment_path
+                      ? "Choisir un autre PDF (20 Mo max)"
+                      : "Ajouter un PDF (20 Mo max)"
+                  }
+                  error={submissionErrors.attachment}
+                >
+                  <input
+                    key={fileKey}
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="block w-full text-body-sm"
+                    onChange={pickPdf}
+                  />
+                </Field>
+              </div>
             ) : (
               <Field
                 label="Document PDF (optionnel, 20 Mo max)"
@@ -528,30 +619,7 @@ function ManagerSpace() {
                   type="file"
                   accept="application/pdf,.pdf"
                   className="block w-full text-body-sm"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    if (f && f.type !== "application/pdf") {
-                      setSubmissionErrors({
-                        ...submissionErrors,
-                        attachment: "Seuls les fichiers PDF sont acceptés.",
-                      });
-                      e.target.value = "";
-                      setAttachment(null);
-                      return;
-                    }
-                    if (f && f.size > 20 * 1024 * 1024) {
-                      setSubmissionErrors({
-                        ...submissionErrors,
-                        attachment: "Le fichier dépasse 20 Mo.",
-                      });
-                      e.target.value = "";
-                      setAttachment(null);
-                      return;
-                    }
-                    const { attachment: _a, ...rest } = submissionErrors;
-                    setSubmissionErrors(rest);
-                    setAttachment(f);
-                  }}
+                  onChange={pickPdf}
                 />
               </Field>
             )}
