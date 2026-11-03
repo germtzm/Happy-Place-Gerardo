@@ -16,11 +16,12 @@ import { AdminHome } from "@/components/home/admin-home";
 import { CollaborateurHome } from "@/components/home/collaborateur-home";
 import { FullViewContext, type FullView } from "@/components/home/full-view-context";
 import { BlockersListView, MetricsListView, NewsListView } from "@/components/home/full-views";
+import { HomeContext } from "@/components/home/home-context";
 import { HomeHeader } from "@/components/home/home-header";
 import { SubmissionActionsContext } from "@/components/home/submission-actions-context";
 import { ManagerHome } from "@/components/home/manager-home";
-import { NotificationsView } from "@/components/home/notifications-view";
 import type { HomeProps } from "@/components/home/types";
+import { NOTIFICATIONS_ID, OVERVIEW_ID } from "@/lib/side-nav";
 import {
   canDecideSubmission,
   exportMyRecentSubmissions,
@@ -100,25 +101,23 @@ function ManagerSpace() {
   const [reading, setReading] = useState<Submission | null>(null);
   const [readingNews, setReadingNews] = useState<News | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  // Vue complète ouverte depuis les cartes de l'accueil (une seule à la fois, exclusive de Notifications).
+  // Section active du menu latéral : un seul état, partagé avec la cloche par HomeContext. À la
+  // connexion, la section d'action du rôle (Demandes, ou En attente pour le collaborateur).
+  const [activeSection, setActiveSection] = useState(canReview ? "demandes" : "en-attente");
+  // Vue complète ouverte depuis les cartes de la Vue d'ensemble (une seule à la fois).
   const [fullView, setFullView] = useState<FullView | null>(null);
   const lastFullView = useRef<FullView | null>(null);
-  // Au retour d'une vue complète, le focus revient sur son lien « VOIR TOUS… ».
+  // Au retour d'une vue complète, on revient sur la Vue d'ensemble et le focus va à son lien « VOIR TOUS… ».
   useEffect(() => {
     if (lastFullView.current && !fullView) {
       document.getElementById(`see-all-${lastFullView.current}`)?.focus();
     }
     lastFullView.current = fullView;
   }, [fullView]);
-  const wasNotificationsOpen = useRef(false);
-  // Au retour de la vue Notifications, le focus revient sur la cloche qui réapparaît.
-  useEffect(() => {
-    if (wasNotificationsOpen.current && !notificationsOpen) {
-      document.getElementById("notification-bell")?.focus();
-    }
-    wasNotificationsOpen.current = notificationsOpen;
-  }, [notificationsOpen]);
+  function closeFullView() {
+    setActiveSection(OVERVIEW_ID);
+    setFullView(null);
+  }
   const [rejectForm, setRejectForm] = useState({ rejection_category: "", rejection_note: "" });
   const [rejectErrors, setRejectErrors] = useState<FieldErrors>({});
 
@@ -256,6 +255,18 @@ function ManagerSpace() {
     setDeleting(s);
   }
 
+  function startSubmit() {
+    setSubmissionErrors({});
+    const only = role === "manager" && myTeams.data?.length === 1 ? myTeams.data[0] : "";
+    setSubmissionForm({
+      author_name: "",
+      team: only,
+      content: "",
+      status: "en attente",
+      hide_author: false,
+    });
+  }
+
   const roleLabel = role === "admin" ? "ADMIN" : role === "manager" ? "MANAGER" : "COLLABORATEUR";
   // Un manager ne décide pas de sa propre demande (la base le refuse aussi).
   const readerCanDecide =
@@ -310,79 +321,53 @@ function ManagerSpace() {
         email={myEmail}
         onOpenNotifications={() => {
           setFullView(null);
-          setNotificationsOpen(true);
+          setActiveSection(NOTIFICATIONS_ID);
         }}
-        hideBell={notificationsOpen}
       />
       <main className="flex-grow w-full max-w-interface mx-auto p-sm md:p-md space-y-md">
         {fullView === "news" && (
-          <NewsListView
-            isAdmin={isAdmin}
-            onBack={() => setFullView(null)}
-            onReadNews={setReadingNews}
-          />
+          <NewsListView isAdmin={isAdmin} onBack={closeFullView} onReadNews={setReadingNews} />
         )}
         {fullView === "blockers" && (
           <BlockersListView
             isAdmin={isAdmin}
-            onBack={() => setFullView(null)}
+            onBack={closeFullView}
             onOpenArchive={() => setArchiveOpen(true)}
           />
         )}
-        {fullView === "metrics" && (
-          <MetricsListView isAdmin={isAdmin} onBack={() => setFullView(null)} />
-        )}
-        {notificationsOpen && (
-          <NotificationsView
-            email={myEmail}
-            role={role}
-            onBack={() => setNotificationsOpen(false)}
-            onReadSubmission={setReading}
-          />
-        )}
-        {/* L'accueil reste monté (masqué) pendant la vue Notifications : l'onglet actif est conservé. */}
-        <div hidden={notificationsOpen || fullView !== null} className="space-y-md">
-          <HomeHeader
-            email={email}
-            roleLabel={roleLabel}
-            isAdmin={isAdmin}
-            exporting={exportReport.isPending}
-            onExport={() => exportReport.mutate()}
-            onSubmitIdea={() => {
-              setSubmissionErrors({});
-              const only = role === "manager" && myTeams.data?.length === 1 ? myTeams.data[0] : "";
-              setSubmissionForm({
-                author_name: "",
-                team: only,
-                content: "",
-                status: "en attente",
-                hide_author: false,
-              });
-            }}
-          />
+        {fullView === "metrics" && <MetricsListView isAdmin={isAdmin} onBack={closeFullView} />}
+        {/* L'accueil (en-tête et menu) reste monté, masqué seulement pendant une vue « Voir tout » :
+            les panneaux gardent leur état. */}
+        <div hidden={fullView !== null} className="space-y-md">
+          <HomeHeader email={email} roleLabel={roleLabel} isAdmin={isAdmin} />
 
-          <FullViewContext.Provider
-            value={(v) => {
-              setNotificationsOpen(false);
-              setFullView(v);
+          <HomeContext.Provider
+            value={{
+              activeId: activeSection,
+              onChange: setActiveSection,
+              onSubmitRequest: startSubmit,
+              onExport: () => exportReport.mutate(),
+              exporting: exportReport.isPending,
             }}
           >
-            <SubmissionActionsContext.Provider
-              value={{ email: myEmail, onEdit: startEdit, onDelete: startDelete }}
-            >
-              <Home
-                role={role}
-                email={myEmail}
-                managerTeams={myTeams.data ?? []}
-                myName={myName}
-                onReadNews={setReadingNews}
-                onReadSubmission={setReading}
-                onReject={startReject}
-                onApprove={(s) => review.mutate({ id: s.id, status: "validée" })}
-                onOpenArchive={() => setArchiveOpen(true)}
-              />
-            </SubmissionActionsContext.Provider>
-          </FullViewContext.Provider>
+            <FullViewContext.Provider value={setFullView}>
+              <SubmissionActionsContext.Provider
+                value={{ email: myEmail, onEdit: startEdit, onDelete: startDelete }}
+              >
+                <Home
+                  role={role}
+                  email={myEmail}
+                  managerTeams={myTeams.data ?? []}
+                  myName={myName}
+                  onReadNews={setReadingNews}
+                  onReadSubmission={setReading}
+                  onReject={startReject}
+                  onApprove={(s) => review.mutate({ id: s.id, status: "validée" })}
+                  onOpenArchive={() => setArchiveOpen(true)}
+                />
+              </SubmissionActionsContext.Provider>
+            </FullViewContext.Provider>
+          </HomeContext.Provider>
         </div>
       </main>
       <BlockerArchive open={archiveOpen} onClose={() => setArchiveOpen(false)} />

@@ -1,35 +1,44 @@
-import { useState, type ReactNode } from "react";
-import { OVERVIEW_ID } from "@/lib/side-nav";
-import { SideNavLayout } from "./side-nav-layout";
+import { useContext, type ReactNode } from "react";
+import { HomeContext } from "./home-context";
+import { SideNavLayout, type TitleAside } from "./side-nav-layout";
 import type { SideNavItem } from "./side-nav";
 
 export type HomeSection = SideNavItem & {
   panel: ReactNode;
   /** Affiché à droite du titre quand la section est active. */
-  titleAside?: ReactNode;
+  titleAside?: TitleAside;
 };
 
+function toItem({ panel: _panel, titleAside: _aside, ...item }: HomeSection): SideNavItem {
+  return item;
+}
+
 /**
- * Accueil à menu latéral. L'état de la section active vit ici, et nulle part ailleurs. Tous les
+ * Accueil à menu latéral. La section active vient de HomeContext (un seul état, dans la page). Tous les
  * panneaux restent montés, seul l'actif est visible : leur état (formulaires, filtres) est conservé.
+ * `bottomSections` forme le groupe du bas du rail (Notifications, Récapitulatif).
  */
 export function HomeSections({
   sections,
-  defaultId = OVERVIEW_ID,
+  bottomSections = [],
 }: {
   sections: HomeSection[];
-  defaultId?: string;
+  bottomSections?: HomeSection[];
 }) {
-  const [active, setActive] = useState(defaultId);
-  const items: SideNavItem[] = sections.map(
-    ({ panel: _panel, titleAside: _aside, ...item }) => item,
-  );
-  const titleAside = sections.find((s) => s.id === active)?.titleAside;
+  const { activeId, onChange } = useContext(HomeContext);
+  const all = [...sections, ...bottomSections];
+  const titleAside = all.find((s) => s.id === activeId)?.titleAside;
 
   return (
-    <SideNavLayout items={items} activeId={active} onChange={setActive} titleAside={titleAside}>
-      {sections.map((s) => (
-        <div key={s.id} id={`section-${s.id}`} hidden={active !== s.id} className="space-y-xs">
+    <SideNavLayout
+      items={sections.map(toItem)}
+      bottomItems={bottomSections.map(toItem)}
+      activeId={activeId}
+      onChange={onChange}
+      titleAside={titleAside}
+    >
+      {all.map((s) => (
+        <div key={s.id} id={`section-${s.id}`} hidden={activeId !== s.id} className="space-y-xs">
           {s.panel}
         </div>
       ))}

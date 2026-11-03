@@ -11,7 +11,9 @@ import { ValidatedSubmissions } from "@/components/dashboard-extras";
 import { MySubmissionItem } from "./my-submissions";
 import { OVERVIEW_ID, plural } from "@/lib/side-nav";
 import { HomeSections, type HomeSection } from "./home-sections";
+import { RequestActions } from "./request-actions";
 import { HomeTopCards } from "./top-cards";
+import { useBottomSections } from "./use-bottom-sections";
 
 const TABS = [
   {
@@ -76,6 +78,12 @@ export function MyRequestsSections({
     retry: false,
   });
 
+  const bottomSections = useBottomSections({
+    email,
+    role: "collaborateur",
+    onReadSubmission: onRead,
+  });
+
   const sections: HomeSection[] = TABS.map((t) => {
     const items = mine.data?.filter((s) => s.status === t.status) ?? [];
     return {
@@ -85,14 +93,20 @@ export function MyRequestsSections({
       icon: t.icon,
       count: items.length,
       ariaLabel: `${t.label}, ${items.length} ${plural(items.length, "demande", "demandes")}`,
+      // « Soumettre une demande » et « Exporter le rapport » : dans l'en-tête de la section En attente.
+      titleAside: t.id === "en-attente" ? <RequestActions /> : undefined,
       panel: (
-        <>
-          {mine.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
+        <div className="grid grid-cols-1 items-start gap-xs xl:grid-cols-2">
+          {mine.isLoading && (
+            <p className="col-span-full text-body-sm text-on-surface-variant">Chargement…</p>
+          )}
           {mine.isError && (
-            <p className="text-body-sm text-error">Tes demandes sont indisponibles.</p>
+            <p className="col-span-full text-body-sm text-error">
+              Tes demandes sont indisponibles.
+            </p>
           )}
           {mine.data && items.length === 0 && (
-            <p className="text-body-sm text-on-surface-variant italic">
+            <p className="col-span-full text-body-sm text-on-surface-variant italic">
               Aucune demande {t.label.toLowerCase()}.
             </p>
           )}
@@ -105,7 +119,7 @@ export function MyRequestsSections({
               waitingSince={waiting.data?.[s.id] ?? s.created_at}
             />
           ))}
-        </>
+        </div>
       ),
     };
   });
@@ -137,5 +151,5 @@ export function MyRequestsSections({
     ),
   });
 
-  return <HomeSections sections={sections} defaultId="en-attente" />;
+  return <HomeSections sections={sections} bottomSections={bottomSections} />;
 }

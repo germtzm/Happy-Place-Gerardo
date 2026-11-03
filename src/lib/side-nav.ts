@@ -1,6 +1,10 @@
 /** Identifiant de l'entrée « Vue d'ensemble » (les trois cartes du haut), active à l'ouverture. */
 export const OVERVIEW_ID = "vue-ensemble";
 
+/** Entrées du groupe du bas du rail. */
+export const NOTIFICATIONS_ID = "notifications";
+export const RECAP_ID = "recapitulatif";
+
 /** Pluriel simple pour les noms accessibles des compteurs. */
 export function plural(n: number, one: string, many: string): string {
   return n > 1 ? many : one;

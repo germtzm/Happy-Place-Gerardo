@@ -2,6 +2,12 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 import { SideNav, type SideNavItem } from "./side-nav";
 
 /**
+ * Élément facultatif à droite du titre de la section active (compteur, boutons). Une fonction reçoit
+ * de quoi redonner le focus au titre (par exemple quand un bouton disparaît après son action).
+ */
+export type TitleAside = ReactNode | ((focusTitle: () => void) => ReactNode);
+
+/**
  * Page à menu latéral : le menu à gauche (au-dessus du contenu en dessous de md), la section active à
  * droite sous son titre. Un lien d'évitement mène au titre ; à chaque changement de section, le focus
  * va au titre (tabIndex -1). Pas de focus au premier affichage.
@@ -33,8 +39,7 @@ export function SideNavLayout({
   bottomItems?: SideNavItem[];
   activeId: string;
   onChange: (id: string) => void;
-  /** Élément facultatif à droite du titre de la section active (par exemple un compteur). */
-  titleAside?: ReactNode;
+  titleAside?: TitleAside;
   children: ReactNode;
 }) {
   const titleId = useId();
@@ -77,7 +82,9 @@ export function SideNavLayout({
           >
             {title}
           </h2>
-          {titleAside}
+          {typeof titleAside === "function"
+            ? titleAside(() => titleRef.current?.focus())
+            : titleAside}
         </div>
         {children}
       </section>

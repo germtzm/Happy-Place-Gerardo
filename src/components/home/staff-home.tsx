@@ -16,6 +16,8 @@ import { NewsSection } from "./news-section";
 import { NewCountPill, PendingSubmissions } from "./pending-submissions";
 import { OVERVIEW_ID, plural } from "@/lib/side-nav";
 import { HomeSections, type HomeSection } from "./home-sections";
+import { RequestActions } from "./request-actions";
+import { useBottomSections } from "./use-bottom-sections";
 import { HomeTopCards } from "./top-cards";
 import type { HomeProps } from "./types";
 
@@ -66,6 +68,11 @@ export function StaffHome({
   ...p
 }: HomeProps & { isAdmin: boolean; management: ManagementTab }) {
   const counts = useStaffCounts(p.email);
+  const bottomSections = useBottomSections({
+    email: p.email,
+    role: p.role,
+    onReadSubmission: p.onReadSubmission,
+  });
 
   const sections: HomeSection[] = [
     {
@@ -80,7 +87,12 @@ export function StaffHome({
       icon: "inbox",
       count: counts.pending,
       ariaLabel: named("Demandes", counts.pending, "à traiter"),
-      titleAside: <NewCountPill count={typeof counts.pending === "number" ? counts.pending : 0} />,
+      titleAside: (
+        <div className="flex flex-wrap items-center gap-sm">
+          <NewCountPill count={typeof counts.pending === "number" ? counts.pending : 0} />
+          <RequestActions />
+        </div>
+      ),
       panel: (
         <div className="space-y-md">
           <PendingSubmissions
@@ -170,5 +182,5 @@ export function StaffHome({
     },
   ];
 
-  return <HomeSections sections={sections} defaultId="demandes" />;
+  return <HomeSections sections={sections} bottomSections={bottomSections} />;
 }

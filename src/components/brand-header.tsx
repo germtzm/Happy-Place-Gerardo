@@ -3,17 +3,15 @@ import sharkLogo from "@/assets/bigger-boat-shark.png";
 import { NotificationBell } from "@/components/home/notification-bell";
 
 /**
- * `email` et `onOpenNotifications` : renseignés sur l'accueil pour afficher la cloche des notifications ;
- * `hideBell` la masque pendant que la vue Notifications est ouverte.
+ * `email` et `onOpenNotifications` : renseignés sur l'accueil pour afficher la cloche des notifications
+ * (elle reste visible et ouvre la section Notifications du menu).
  */
 export function BrandHeader({
   email,
   onOpenNotifications,
-  hideBell,
 }: {
   email?: string;
   onOpenNotifications?: () => void;
-  hideBell?: boolean;
 }) {
   return (
     <header className="border-b border-outline-variant bg-surface-container-lowest">
@@ -38,7 +36,7 @@ export function BrandHeader({
           <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
             Happy Place
           </span>
-          {email && onOpenNotifications && !hideBell && (
+          {email && onOpenNotifications && (
             <NotificationBell email={email} onOpen={onOpenNotifications} />
           )}
         </div>
