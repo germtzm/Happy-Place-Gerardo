@@ -119,6 +119,19 @@ export function NotificationsView({
                           VOIR LA DEMANDE →
                         </button>
                       )}
+                      {/* Demande supprimée par son auteur : pas de demande à ouvrir, donc le marquage « lu »
+                          passe par ce bouton (seule read_at change). Une fois lue, la règle commune la masque. */}
+                      {!n.submission && n.deleted_by_author_at && !n.read_at && (
+                        <button
+                          type="button"
+                          disabled={markRead.isPending}
+                          onClick={() => markRead.mutate(n.id)}
+                          aria-label="Marquer comme lue : demande supprimée par son auteur"
+                          className="inline-flex min-h-[44px] items-center font-label-md text-label-md uppercase text-primary underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
+                        >
+                          MARQUER COMME LUE
+                        </button>
+                      )}
                     </div>
                   </li>
                 );

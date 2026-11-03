@@ -439,10 +439,12 @@ export type NotificationType = "nouvelle_demande" | "decision";
 export type NotificationItem = {
   id: string;
   type: NotificationType;
-  submission_id: string;
+  /** NULL quand l'auteur a supprimé sa demande (deleted_by_author_at est alors renseigné). */
+  submission_id: string | null;
   created_at: string;
   read_at: string | null;
-  /** Demande liée, lue avec la RLS existante ; null si elle n'est plus lisible. */
+  deleted_by_author_at: string | null;
+  /** Demande liée, lue avec la RLS existante ; null si elle n'est plus lisible ou supprimée. */
   submission: Submission | null;
 };
 
@@ -458,8 +460,11 @@ const NOTIFICATION_FETCH_CAP = 200;
 export function isNotificationVisible(n: {
   type: string;
   read_at: string | null;
+  /** Renseigné quand l'auteur a supprimé sa demande : se comporte comme une décision (visible tant que non lue). */
+  deleted_by_author_at?: string | null;
   submission: Pick<Submission, "status"> | null;
 }): boolean {
+  if (n.deleted_by_author_at) return n.read_at === null;
   if (n.type === "nouvelle_demande") return n.submission?.status === "en attente";
   return n.read_at === null;
 }
@@ -487,7 +492,7 @@ export async function fetchPendingNotifications(): Promise<{
 }> {
   const { data, error } = await db
     .from("notifications")
-    .select("id, type, submission_id, created_at, read_at")
+    .select("id, type, submission_id, created_at, read_at, deleted_by_author_at")
     .or("read_at.is.null,type.eq.nouvelle_demande")
     .order("created_at", { ascending: false })
     .limit(NOTIFICATION_FETCH_CAP);
@@ -495,16 +500,19 @@ export async function fetchPendingNotifications(): Promise<{
   const rows = data ?? [];
   if (rows.length === 0) return { items: [], unread: 0 };
 
-  const ids = [...new Set(rows.map((r) => r.submission_id))];
-  const { data: subs, error: subsError } = await db.from("submissions").select("*").in("id", ids);
-  if (subsError) throw subsError;
-  const byId = new Map((subs ?? []).map((s) => [s.id, s as Submission]));
+  const ids = [...new Set(rows.flatMap((r) => (r.submission_id ? [r.submission_id] : [])))];
+  const byId = new Map<string, Submission>();
+  if (ids.length > 0) {
+    const { data: subs, error: subsError } = await db.from("submissions").select("*").in("id", ids);
+    if (subsError) throw subsError;
+    for (const s of subs ?? []) byId.set(s.id, s as Submission);
+  }
 
   return selectVisibleNotifications(
     rows.map((r) => ({
       ...r,
       type: r.type as NotificationType,
-      submission: byId.get(r.submission_id) ?? null,
+      submission: r.submission_id ? (byId.get(r.submission_id) ?? null) : null,
     })),
   );
 }
@@ -672,8 +680,10 @@ const NOTIFICATION_EXCERPT_LENGTH = 80;
 /** Titre d'une ligne de notification ; sans demande lisible, un libellé générique sans détail. */
 export function notificationTitle(n: {
   type: string;
+  deleted_by_author_at?: string | null;
   submission: Pick<Submission, "author_name" | "team" | "status"> | null;
 }): string {
+  if (n.deleted_by_author_at) return "Demande supprimée par son auteur";
   const s = n.submission;
   if (n.type === "nouvelle_demande") {
     return s ? `Nouvelle demande de ${s.author_name} (${s.team})` : "Nouvelle demande";
@@ -707,6 +717,26 @@ export async function updateSubmission(id: string, input: SubmissionInput) {
 export async function deleteSubmission(id: string) {
   const { error } = await db.from("submissions").delete().eq("id", id);
   if (error) throw error;
+}
+
+/** L'auteur modifie le texte et l'option « masquer mon nom » de sa demande « en attente » (rpc). */
+export async function updateMySubmission(input: {
+  id: string;
+  content: string;
+  hide_author: boolean;
+}) {
+  const { error } = await rpcUntyped<null>("update_my_submission", {
+    p_id: input.id,
+    p_content: input.content,
+    p_hide_author: input.hide_author,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** L'auteur supprime sa demande « en attente » ; la pièce jointe part en file d'effacement (rpc). */
+export async function deleteMySubmission(id: string) {
+  const { error } = await rpcUntyped<null>("delete_my_submission", { p_id: id });
+  if (error) throw new Error(error.message);
 }
 
 export async function fetchAllBlockers(): Promise<Blocker[]> {

@@ -306,26 +306,29 @@ export type Database = {
       notifications: {
         Row: {
           created_at: string
+          deleted_by_author_at: string | null
           id: string
           read_at: string | null
           recipient_email: string
-          submission_id: string
+          submission_id: string | null
           type: string
         }
         Insert: {
           created_at?: string
+          deleted_by_author_at?: string | null
           id?: string
           read_at?: string | null
           recipient_email: string
-          submission_id: string
+          submission_id?: string | null
           type: string
         }
         Update: {
           created_at?: string
+          deleted_by_author_at?: string | null
           id?: string
           read_at?: string | null
           recipient_email?: string
-          submission_id?: string
+          submission_id?: string | null
           type?: string
         }
         Relationships: [

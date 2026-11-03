@@ -1,9 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { useContext } from "react";
 import { AttachmentLink } from "@/components/attachment-link";
 import { SubmissionPreview } from "@/components/expandable-card";
 import { Linkify } from "@/components/linkify";
 import { fetchMySubmissions, timeAgo, type Submission } from "@/lib/dashboard";
+import { canManageOwnSubmission, submissionLabel } from "@/lib/own-submission";
 import { waitingDays, waitingLabel } from "@/lib/waiting";
+import { SubmissionActionsContext } from "./submission-actions-context";
 
 /** Validateurs : undefined = inconnu (masqué), "" = aucun manager. Attente : date de début, si connue. */
 export function MySubmissionItem({
@@ -18,6 +21,11 @@ export function MySubmissionItem({
   waitingSince?: string;
 }) {
   const pending = s.status === "en attente";
+  const actions = useContext(SubmissionActionsContext);
+  const own = !!actions && canManageOwnSubmission(s, actions.email);
+  const label = submissionLabel(s.content);
+  const actionCls =
+    "inline-flex min-h-[44px] items-center border border-outline px-md font-label-md text-label-md uppercase text-primary hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
   return (
     <div className="p-sm border border-outline-variant bg-card min-w-0 overflow-hidden">
       <SubmissionPreview content={s.content} onOpen={() => onRead(s)} />
@@ -42,6 +50,28 @@ export function MySubmissionItem({
               {waitingLabel(waitingDays(waitingSince))}
             </span>
           )}
+        </div>
+      )}
+      {own && actions && (
+        <div className="mt-xs flex flex-wrap gap-xs">
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-label={`Modifier ma demande : ${label}`}
+            onClick={() => actions.onEdit(s)}
+            className={actionCls}
+          >
+            Modifier
+          </button>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-label={`Supprimer ma demande : ${label}`}
+            onClick={() => actions.onDelete(s)}
+            className={actionCls}
+          >
+            Supprimer
+          </button>
         </div>
       )}
       {s.status === "refusée" && s.rejection_category && (

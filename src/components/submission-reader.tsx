@@ -4,6 +4,7 @@ import { AttachmentLink } from "@/components/attachment-link";
 import { AuthorHiddenNote } from "@/components/author-hidden-note";
 import { formatExactDate } from "@/components/expandable-card";
 import type { Submission } from "@/lib/dashboard";
+import { submissionLabel } from "@/lib/own-submission";
 
 /** Grande fenêtre de lecture d'une soumission (focus piégé, Échap, clic fond). */
 export function SubmissionReader({
@@ -13,6 +14,8 @@ export function SubmissionReader({
   onReject,
   onApprove,
   approving,
+  onEdit,
+  onDelete,
 }: {
   submission: Submission | null;
   statusLabel?: string;
@@ -20,6 +23,9 @@ export function SubmissionReader({
   onReject?: () => void;
   onApprove?: () => void;
   approving?: boolean;
+  /** Fournis seulement à l'auteur d'une demande « en attente ». */
+  onEdit?: () => void;
+  onDelete?: () => void;
 }) {
   return (
     <DialogPrimitive.Root open={!!s} onOpenChange={(o) => !o && onClose()}>
@@ -58,6 +64,32 @@ export function SubmissionReader({
                 </div>
               )}
             </div>
+            {(onEdit || onDelete) && (
+              <div className="flex flex-wrap gap-xs border-t border-outline-variant p-md">
+                {onEdit && (
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    aria-label={`Modifier ma demande : ${submissionLabel(s.content)}`}
+                    onClick={onEdit}
+                    className="min-h-[44px] flex-1 border border-outline px-md py-sm font-label-sm text-label-sm text-primary hover:bg-surface-container transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    MODIFIER
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    aria-label={`Supprimer ma demande : ${submissionLabel(s.content)}`}
+                    onClick={onDelete}
+                    className="min-h-[44px] flex-1 border border-outline px-md py-sm font-label-sm text-label-sm text-primary hover:bg-surface-container transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    SUPPRIMER
+                  </button>
+                )}
+              </div>
+            )}
             {(onReject || onApprove) && (
               <div className="flex gap-xs border-t border-outline-variant p-md">
                 {onReject && (

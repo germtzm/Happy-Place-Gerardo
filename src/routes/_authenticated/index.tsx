@@ -1,3 +1,4 @@
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,6 +16,7 @@ import { CollaborateurHome } from "@/components/home/collaborateur-home";
 import { FullViewContext, type FullView } from "@/components/home/full-view-context";
 import { BlockersListView, MetricsListView, NewsListView } from "@/components/home/full-views";
 import { HomeHeader } from "@/components/home/home-header";
+import { SubmissionActionsContext } from "@/components/home/submission-actions-context";
 import { ManagerHome } from "@/components/home/manager-home";
 import { NotificationsView } from "@/components/home/notifications-view";
 import type { HomeProps } from "@/components/home/types";
@@ -28,7 +30,10 @@ import {
   reviewSubmission,
   submitIdea,
   type SubmissionInput,
+  updateMySubmission,
+  deleteMySubmission,
 } from "@/lib/dashboard";
+import { canManageOwnSubmission } from "@/lib/own-submission";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -173,6 +178,60 @@ function ManagerSpace() {
     onError: (e: unknown) => toast.error(rejectionErrorMessage(e)),
   });
 
+  // Modifier / supprimer sa propre demande « en attente » (la base refait tous les contrôles).
+  const [editing, setEditing] = useState<Submission | null>(null);
+  const [deleting, setDeleting] = useState<Submission | null>(null);
+  const afterOwnChange = () => {
+    qc.invalidateQueries({ queryKey: ["submissions"] });
+    qc.invalidateQueries({ queryKey: ["notifications"] });
+  };
+  const updateMine = useMutation({
+    mutationFn: updateMySubmission,
+    onSuccess: () => {
+      closeForm();
+      setReading(null);
+      toast.success("Demande modifiée");
+      afterOwnChange();
+    },
+    // La fenêtre reste ouverte : le message de la base (par exemple « déjà traitée ») s'affiche.
+    onError,
+  });
+  const deleteMine = useMutation({
+    mutationFn: deleteMySubmission,
+    onSuccess: () => {
+      setDeleting(null);
+      setReading(null);
+      toast.success("Demande supprimée");
+      afterOwnChange();
+    },
+    onError,
+  });
+
+  function closeForm() {
+    setSubmissionForm(null);
+    setSubmissionErrors({});
+    setEditing(null);
+  }
+
+  function startEdit(s: Submission) {
+    setReading(null);
+    setSubmissionErrors({});
+    setEditing(s);
+    setSubmissionForm({
+      author_name: s.author_name,
+      team: s.team,
+      content: s.content,
+      status: "en attente",
+      hide_author: s.hide_author ?? false,
+    });
+  }
+
+  // La fenêtre de lecture reste ouverte dessous : à l'annulation, le focus revient sur son bouton
+  // « Supprimer » ; elle se ferme avec la confirmation en cas de succès (deleteMine.onSuccess).
+  function startDelete(s: Submission) {
+    setDeleting(s);
+  }
+
   const roleLabel = role === "admin" ? "ADMIN" : role === "manager" ? "MANAGER" : "COLLABORATEUR";
   // Un manager ne décide pas de sa propre demande (la base le refuse aussi).
   const readerCanDecide =
@@ -184,6 +243,25 @@ function ManagerSpace() {
   function sendSubmission(e: React.FormEvent) {
     e.preventDefault();
     if (!submissionForm) return;
+    if (editing) {
+      // Mêmes règles de validation qu'à la création ; l'équipe n'est pas modifiable.
+      const res = validate(ideaSchema, {
+        ...submissionForm,
+        team: editing.team,
+        status: "en attente",
+      });
+      if (!res.ok) {
+        setSubmissionErrors(res.errors);
+        return;
+      }
+      setSubmissionErrors({});
+      updateMine.mutate({
+        id: editing.id,
+        content: res.data.content,
+        hide_author: res.data.hide_author ?? false,
+      });
+      return;
+    }
     // Collaborators: team is set server-side from their account
     // Admin: always the « Admin » team (set server-side); manager: one of their teams
     const team = role === "collaborateur" ? "auto" : role === "admin" ? "Admin" : submissionForm.team;
@@ -264,17 +342,21 @@ function ManagerSpace() {
               setFullView(v);
             }}
           >
-            <Home
-              role={role}
-              email={myEmail}
-              managerTeams={myTeams.data ?? []}
-              myName={myName}
-              onReadNews={setReadingNews}
-              onReadSubmission={setReading}
-              onReject={startReject}
-              onApprove={(s) => review.mutate({ id: s.id, status: "validée" })}
-              onOpenArchive={() => setArchiveOpen(true)}
-            />
+            <SubmissionActionsContext.Provider
+              value={{ email: myEmail, onEdit: startEdit, onDelete: startDelete }}
+            >
+              <Home
+                role={role}
+                email={myEmail}
+                managerTeams={myTeams.data ?? []}
+                myName={myName}
+                onReadNews={setReadingNews}
+                onReadSubmission={setReading}
+                onReject={startReject}
+                onApprove={(s) => review.mutate({ id: s.id, status: "validée" })}
+                onOpenArchive={() => setArchiveOpen(true)}
+              />
+            </SubmissionActionsContext.Provider>
           </FullViewContext.Provider>
         </div>
       </main>
@@ -290,7 +372,50 @@ function ManagerSpace() {
             : undefined
         }
         approving={review.isPending}
+        onEdit={
+          reading && canManageOwnSubmission(reading, myEmail) ? () => startEdit(reading) : undefined
+        }
+        onDelete={
+          reading && canManageOwnSubmission(reading, myEmail)
+            ? () => startDelete(reading)
+            : undefined
+        }
       />
+      {/* Confirmation de suppression : Radix Dialog (Échap, clic extérieur, focus piégé puis rendu au
+          bouton « Supprimer » qui l'a ouverte). Le titre est lié par Radix (aria-labelledby). */}
+      <DialogPrimitive.Root open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-black/50" />
+          {deleting && (
+            <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-[60] max-h-[90dvh] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto border border-outline bg-surface-container-lowest p-md shadow-lg focus:outline-none">
+              <DialogPrimitive.Title className="border-b border-outline-variant pb-sm font-headline-sm text-headline-sm text-primary">
+                Supprimer ma demande
+              </DialogPrimitive.Title>
+              <div className="mt-sm space-y-sm">
+                <p className="max-h-48 overflow-y-auto border border-outline-variant bg-surface-container-low p-xs text-body-sm italic text-on-surface-variant whitespace-pre-line wrap-anywhere">
+                  “{deleting.content}”
+                </p>
+                <DialogPrimitive.Description className="text-body-md text-on-surface">
+                  Cette demande et sa pièce jointe seront supprimées. Cette action est définitive.
+                </DialogPrimitive.Description>
+                <div className="flex flex-wrap justify-end gap-xs">
+                  <DialogPrimitive.Close className="min-h-[44px] border border-outline px-md font-label-md text-label-md uppercase text-primary hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                    Annuler
+                  </DialogPrimitive.Close>
+                  <button
+                    type="button"
+                    disabled={deleteMine.isPending}
+                    onClick={() => deleteMine.mutate(deleting.id)}
+                    className="min-h-[44px] bg-error px-md font-label-md text-label-md uppercase text-white hover:opacity-90 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  >
+                    Supprimer définitivement
+                  </button>
+                </div>
+              </div>
+            </DialogPrimitive.Content>
+          )}
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
       {rejecting && (
         <Modal title="Refuser la soumission" onClose={() => setRejecting(null)}>
           <form
@@ -332,12 +457,16 @@ function ManagerSpace() {
         </Modal>
       )}
       {submissionForm && (
-        <Modal title="Soumettre une proposition" onClose={() => setSubmissionForm(null)}>
+        <Modal
+          title={editing ? "Modifier ma proposition" : "Soumettre une proposition"}
+          onClose={closeForm}
+        >
           <form onSubmit={sendSubmission} className="space-y-sm" noValidate>
             <ErrorSummary errors={submissionErrors} />
             <div>
               <p className="text-body-md text-primary">
-                Signée : <strong>{myFirstName.data ?? "…"}</strong>
+                Signée :{" "}
+                <strong>{editing ? editing.author_name : (myFirstName.data ?? "…")}</strong>
               </p>
               <label className="mt-xs flex items-start gap-xs text-body-md">
                 <input
@@ -354,7 +483,12 @@ function ManagerSpace() {
                 Ton manager et l'admin le voient toujours.
               </p>
             </div>
-            {role === "manager" && (
+            {editing && (
+              <p className="text-body-sm text-on-surface-variant">
+                Équipe : {editing.team} (non modifiable)
+              </p>
+            )}
+            {!editing && role === "manager" && (
               <Field label="Équipe" error={submissionErrors.team}>
                 <select
                   required
@@ -369,7 +503,7 @@ function ManagerSpace() {
                 </select>
               </Field>
             )}
-            {role === "admin" && (
+            {!editing && role === "admin" && (
               <p className="text-body-sm text-on-surface-variant">Équipe : Admin</p>
             )}
             <Field label="Proposition" error={submissionErrors.content}>
@@ -381,31 +515,50 @@ function ManagerSpace() {
               />
               <CharCounter value={submissionForm.content} max={2000} min={5} />
             </Field>
-            <Field label="Document PDF (optionnel, 20 Mo max)" error={submissionErrors.attachment}>
-              <input
-                type="file"
-                accept="application/pdf,.pdf"
-                className="block w-full text-body-sm"
-                onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null;
-                  if (f && f.type !== "application/pdf") {
-                    setSubmissionErrors({ ...submissionErrors, attachment: "Seuls les fichiers PDF sont acceptés." });
-                    e.target.value = ""; setAttachment(null); return;
-                  }
-                  if (f && f.size > 20 * 1024 * 1024) {
-                    setSubmissionErrors({ ...submissionErrors, attachment: "Le fichier dépasse 20 Mo." });
-                    e.target.value = ""; setAttachment(null); return;
-                  }
-                  const { attachment: _a, ...rest } = submissionErrors;
-                  setSubmissionErrors(rest);
-                  setAttachment(f);
-                }}
-              />
-            </Field>
+            {editing ? (
+              <p className="text-body-sm text-on-surface-variant">
+                La pièce jointe reste inchangée.
+              </p>
+            ) : (
+              <Field
+                label="Document PDF (optionnel, 20 Mo max)"
+                error={submissionErrors.attachment}
+              >
+                <input
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="block w-full text-body-sm"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    if (f && f.type !== "application/pdf") {
+                      setSubmissionErrors({
+                        ...submissionErrors,
+                        attachment: "Seuls les fichiers PDF sont acceptés.",
+                      });
+                      e.target.value = "";
+                      setAttachment(null);
+                      return;
+                    }
+                    if (f && f.size > 20 * 1024 * 1024) {
+                      setSubmissionErrors({
+                        ...submissionErrors,
+                        attachment: "Le fichier dépasse 20 Mo.",
+                      });
+                      e.target.value = "";
+                      setAttachment(null);
+                      return;
+                    }
+                    const { attachment: _a, ...rest } = submissionErrors;
+                    setSubmissionErrors(rest);
+                    setAttachment(f);
+                  }}
+                />
+              </Field>
+            )}
             <FormActions
-              pending={submit.isPending}
-              submitLabel="ENVOYER"
-              onCancel={() => setSubmissionForm(null)}
+              pending={submit.isPending || updateMine.isPending}
+              submitLabel={editing ? "ENREGISTRER" : "ENVOYER"}
+              onCancel={closeForm}
             />
           </form>
         </Modal>
