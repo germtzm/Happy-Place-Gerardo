@@ -10,8 +10,10 @@ import {
   isUrgentNotice,
 } from "@/lib/dashboard";
 import { BlockersSection } from "./blockers-section";
+import { Icon } from "./icon";
 import { MetricsSection } from "./metrics-section";
 import { MySubmissions } from "./my-submissions";
+import { useNewsDraftDialog } from "./news-draft-dialog";
 import { NewsSection } from "./news-section";
 import { NewCountPill, PendingSubmissions } from "./pending-submissions";
 import { OVERVIEW_ID, plural } from "@/lib/side-nav";
@@ -68,6 +70,7 @@ export function StaffHome({
   ...p
 }: HomeProps & { isAdmin: boolean; management: ManagementTab }) {
   const counts = useStaffCounts(p.email);
+  const newsDialog = useNewsDraftDialog();
   const bottomSections = useBottomSections({
     email: p.email,
     role: p.role,
@@ -118,6 +121,17 @@ export function StaffHome({
       id: "actualites",
       label: "Actualités",
       title: "Actualités du cabinet",
+      hideTitle: true,
+      titleAside: (
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          onClick={(e) => newsDialog.openCreate(e.currentTarget)}
+          className="flex min-h-[44px] items-center gap-xs bg-primary px-md py-xs font-label-md text-label-md text-on-primary shadow-sm transition-all hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          <Icon name="add" /> CRÉER UNE ACTUALITÉ
+        </button>
+      ),
       icon: "campaign",
       count: counts.drafts,
       ariaLabel: named(
@@ -132,12 +146,14 @@ export function StaffHome({
           myName={p.myName}
           myEmail={p.email}
           onRead={p.onReadNews}
+          newsDialog={newsDialog}
         />
       ),
     },
     {
       id: "points-bloquants",
       label: "Points bloquants",
+      hideTitle: true,
       icon: "warning",
       count: counts.blockers,
       ariaLabel: named(
@@ -151,6 +167,7 @@ export function StaffHome({
       id: "indicateurs",
       label: "Indicateurs",
       title: "Indicateurs clés",
+      hideTitle: true,
       icon: "monitoring",
       count: counts.metrics,
       ariaLabel: named(

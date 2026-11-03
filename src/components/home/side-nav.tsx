@@ -4,7 +4,7 @@ import { Icon } from "./icon";
 
 export type SideNavItem = {
   id: string;
-  /** Libellé court affiché sous l'icône (deux lignes au plus). */
+  /** Libellé court affiché sous l'icône (retour à la ligne entre les mots seulement). */
   label: string;
   /** Nom accessible complet, par exemple « Demandes, 3 à traiter » ; à défaut, `label`. */
   ariaLabel?: string;
@@ -16,11 +16,22 @@ export type SideNavItem = {
   urgent?: boolean;
   /** Titre de la section quand il diffère du libellé court (utilisé par SideNavLayout). */
   title?: string;
+  /**
+   * Titre de section lu mais non affiché (classe `sr-only`) : à utiliser quand la carte de la section
+   * porte déjà le même titre. Le h1 reste dans le DOM (cible du focus au changement d'entrée).
+   */
+  hideTitle?: boolean;
+  /**
+   * Entrée d'action : le clic lance cette fonction au lieu d'ouvrir une section. Elle n'est jamais la
+   * section active (pas d'`aria-current`), ne reçoit pas le focus à titre de section, mais reste dans
+   * la navigation aux flèches.
+   */
+  onSelect?: () => void;
 };
 
 type Props = {
   items: SideNavItem[];
-  /** Groupe placé en bas du rail (Notifications, Récapitulatif). */
+  /** Groupe placé en bas du rail : sections (Notifications, Récapitulatif) puis entrées d'action. */
   bottomItems?: SideNavItem[];
   activeId: string;
   onChange: (id: string) => void;
@@ -46,9 +57,10 @@ function CountBadge({ item, className = "" }: { item: SideNavItem; className?: s
 const separatorCls = "h-auto w-px self-stretch bg-[#CDCDD1] md:h-px md:w-full md:self-auto";
 
 /**
- * Menu latéral : rail de 88 px à gauche à partir de md (au-dessous, les entrées passent à la ligne
- * au-dessus du contenu). Chaque entrée est un bouton, une tabulation chacune ; les flèches haut et
- * bas, Début et Fin déplacent le focus sans activer.
+ * Menu latéral : rail de 96 px collé au bord gauche à partir de md (au-dessous, les entrées passent à la
+ * ligne au-dessus du contenu). Le groupe du haut défile, le groupe du bas reste épinglé. Chaque entrée
+ * est un bouton, une tabulation chacune ; les flèches haut et bas, Début et Fin déplacent le focus sans
+ * activer.
  */
 export function SideNav({ items, bottomItems = [], activeId, onChange }: Props) {
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -63,9 +75,10 @@ export function SideNav({ items, bottomItems = [], activeId, onChange }: Props) 
   }
 
   function renderItem(item: SideNavItem) {
-    const active = item.id === activeId;
+    const isAction = !!item.onSelect;
+    const active = !isAction && item.id === activeId;
     return (
-      <li key={item.id} className="w-[76px] md:w-full">
+      <li key={item.id} className="w-[88px] md:w-full">
         <button
           type="button"
           ref={(el) => {
@@ -73,8 +86,8 @@ export function SideNav({ items, bottomItems = [], activeId, onChange }: Props) 
           }}
           aria-current={active ? "page" : undefined}
           aria-label={item.ariaLabel}
-          onClick={() => onChange(item.id)}
-          className={`flex min-h-[64px] w-full flex-col items-center justify-center gap-[2px] rounded-[8px] px-[2px] py-xs text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#28282D] focus-visible:ring-offset-2 ${
+          onClick={() => (item.onSelect ? item.onSelect() : onChange(item.id))}
+          className={`flex min-h-[64px] w-full flex-col items-center justify-center gap-[2px] rounded-[8px] px-0 py-xs text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#28282D] focus-visible:ring-offset-2 ${
             active ? "bg-[#28282D] text-[#F9F8F5]" : "text-[#55555A] hover:bg-[#EEEDEA]"
           }`}
         >
@@ -90,7 +103,7 @@ export function SideNav({ items, bottomItems = [], activeId, onChange }: Props) 
             </span>
           )}
           {!item.icon && hasCount(item) && <CountBadge item={item} />}
-          <span className="line-clamp-2 font-label-md text-[12px] leading-[1.2] tracking-normal wrap-anywhere">
+          <span className="font-label-md text-[11px] leading-[1.15] tracking-normal break-normal hyphens-none">
             {item.label}
           </span>
         </button>
@@ -102,9 +115,9 @@ export function SideNav({ items, bottomItems = [], activeId, onChange }: Props) 
     <nav
       aria-label="Sections de l'accueil"
       onKeyDown={onKeyDown}
-      className="flex shrink-0 flex-row flex-wrap items-stretch border-b border-[#CDCDD1] bg-white md:sticky md:top-0 md:h-[calc(100dvh-4rem)] md:w-[88px] md:flex-col md:flex-nowrap md:self-start md:overflow-y-auto md:border-b-0 md:border-r"
+      className="flex shrink-0 flex-row flex-wrap items-stretch border-b border-[#CDCDD1] bg-white md:sticky md:top-[var(--home-header-h,4rem)] md:h-[calc(100dvh-var(--home-header-h,4rem))] md:w-[96px] md:flex-col md:flex-nowrap md:self-start md:overflow-hidden md:border-b-0 md:border-r"
     >
-      <ul className="flex flex-wrap gap-[4px] p-[6px] md:flex-col md:flex-nowrap">
+      <ul className="flex flex-wrap gap-[4px] px-[6px] py-[6px] md:min-h-0 md:flex-1 md:flex-col md:flex-nowrap md:overflow-y-auto md:overflow-x-hidden">
         {items.flatMap((item, i) =>
           i === 0 && items.length > 1
             ? [renderItem(item), <li key="sep-first" aria-hidden="true" className={separatorCls} />]
@@ -113,9 +126,16 @@ export function SideNav({ items, bottomItems = [], activeId, onChange }: Props) 
       </ul>
       {bottomItems.length > 0 && (
         <>
-          <div aria-hidden="true" className={`${separatorCls} md:mt-auto`} />
-          <ul className="flex flex-wrap gap-[4px] p-[6px] md:flex-col md:flex-nowrap">
-            {bottomItems.map(renderItem)}
+          <div aria-hidden="true" className={`${separatorCls} md:shrink-0`} />
+          <ul className="flex flex-wrap gap-[4px] px-[6px] py-[6px] md:shrink-0 md:flex-col md:flex-nowrap">
+            {bottomItems.flatMap((item, i) =>
+              item.onSelect && i > 0 && !bottomItems[i - 1].onSelect
+                ? [
+                    <li key={`sep-${item.id}`} aria-hidden="true" className={separatorCls} />,
+                    renderItem(item),
+                  ]
+                : [renderItem(item)],
+            )}
           </ul>
         </>
       )}

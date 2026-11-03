@@ -34,7 +34,7 @@ export function BlockerArchive({ open, onClose }: { open: boolean; onClose: () =
               <p className="text-body-sm text-on-surface-variant italic">Aucun point bloquant résolu.</p>
             )}
             {q.data?.map((b) => (
-              <div key={b.id} className="bg-card border border-outline-variant p-sm min-w-0">
+              <div key={b.id} className="rounded-[8px] bg-card border border-outline-variant p-sm min-w-0">
                 <p className="font-body-md text-primary font-bold wrap-anywhere">{b.title}</p>
                 {b.description && (
                   <p className="text-body-sm text-on-surface-variant whitespace-pre-line wrap-anywhere">{b.description}</p>
@@ -94,7 +94,7 @@ export function ValidatedSubmissions({
       className={
         embedded
           ? "min-w-0"
-          : "col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md"
+          : "col-span-12 min-w-0 rounded-[8px] bg-surface-container-lowest border border-outline-variant p-md"
       }
     >
       {!embedded && <div className="flex flex-wrap items-center justify-between gap-sm border-b border-outline-variant pb-sm mb-md">
@@ -108,7 +108,7 @@ export function ValidatedSubmissions({
               aria-label="Filtrer par équipe"
               value={team}
               onChange={(e) => { setTeam(e.target.value); setLimit(PAGE); }}
-              className="max-w-full bg-card border border-outline-variant p-xs focus:outline-none focus:border-primary"
+              className="max-w-full rounded-[8px] bg-card border border-outline-variant p-xs focus:outline-none focus:border-primary"
             >
               <option value="">Toutes les équipes</option>
               {teams.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -123,7 +123,7 @@ export function ValidatedSubmissions({
       )}
       <div className="grid gap-xs md:grid-cols-2">
         {shown.map((s) => (
-          <div key={s.id} className="p-sm border border-outline-variant bg-card min-w-0 overflow-hidden space-y-xs">
+          <div key={s.id} className="p-sm rounded-[8px] border border-outline-variant bg-card min-w-0 overflow-hidden space-y-xs">
             <p className="text-[11px] font-label-sm text-on-surface-variant uppercase wrap-anywhere">
               <span className="text-primary font-bold">{s.author_name}</span><AuthorHiddenNote s={s} /> • {s.team} •{" "}
               {s.validated_at ? `Validée le ${formatExactDate(s.validated_at)}` : `Soumise le ${formatExactDate(s.created_at)}`}

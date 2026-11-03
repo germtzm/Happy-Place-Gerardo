@@ -16,7 +16,8 @@ function toItem({ panel: _panel, titleAside: _aside, ...item }: HomeSection): Si
 /**
  * Accueil à menu latéral. La section active vient de HomeContext (un seul état, dans la page). Tous les
  * panneaux restent montés, seul l'actif est visible : leur état (formulaires, filtres) est conservé.
- * `bottomSections` forme le groupe du bas du rail (Notifications, Récapitulatif).
+ * `bottomSections` forme le groupe du bas du rail (Notifications, Récapitulatif), suivi des entrées
+ * d'action de HomeContext (Données, Déconnexion).
  */
 export function HomeSections({
   sections,
@@ -25,14 +26,14 @@ export function HomeSections({
   sections: HomeSection[];
   bottomSections?: HomeSection[];
 }) {
-  const { activeId, onChange } = useContext(HomeContext);
+  const { activeId, onChange, railActions } = useContext(HomeContext);
   const all = [...sections, ...bottomSections];
   const titleAside = all.find((s) => s.id === activeId)?.titleAside;
 
   return (
     <SideNavLayout
       items={sections.map(toItem)}
-      bottomItems={bottomSections.map(toItem)}
+      bottomItems={[...bottomSections.map(toItem), ...railActions]}
       activeId={activeId}
       onChange={onChange}
       titleAside={titleAside}

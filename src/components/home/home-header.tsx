@@ -1,41 +1,17 @@
 import { Link } from "@tanstack/react-router";
-import { signOut } from "@/lib/auth";
 import { Icon } from "./icon";
 
-export function HomeHeader({
-  email,
-  roleLabel,
-  isAdmin,
-}: {
-  email: string;
-  roleLabel: string;
-  isAdmin: boolean;
-}) {
+/** Sous le bandeau fixe : seul l'accès admin aux données reste ici (titre, compte et déconnexion sont dans le bandeau). */
+export function HomeHeader({ isAdmin }: { isAdmin: boolean }) {
+  if (!isAdmin) return null;
   return (
-    <div className="flex flex-col md:flex-row md:items-end justify-between gap-sm mb-lg">
-      <div className="space-y-sm">
-        <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">
-          Vue d'ensemble
-        </p>
-        <h1 className="font-headline-lg text-headline-lg text-primary">Happy Place</h1>
-      </div>
-      <div className="flex flex-wrap gap-xs items-center md:items-end md:justify-end">
-        <span className="font-label-sm text-label-sm text-on-surface-variant">
-          {email} · {roleLabel}
-        </span>
-        <button
-          onClick={() => signOut()}
-          className="flex items-center gap-xs px-md py-xs border border-outline bg-surface text-primary font-label-md text-label-md hover:bg-surface-container"
-        >
-          <Icon name="logout" /> DÉCONNEXION
-        </button>
-        {isAdmin && (<Link
-          to="/manage/news"
-          className="flex items-center gap-xs px-md py-xs border border-outline bg-surface text-primary font-label-md text-label-md hover:bg-surface-container transition-all"
-        >
-          <Icon name="database" /> GÉRER LES DONNÉES
-        </Link>)}
-      </div>
+    <div className="mb-lg flex flex-wrap items-center justify-end gap-xs">
+      <Link
+        to="/manage/news"
+        className="flex min-h-[44px] items-center gap-xs border border-outline bg-surface px-md py-xs font-label-md text-label-md text-primary transition-all hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      >
+        <Icon name="database" /> GÉRER LES DONNÉES
+      </Link>
     </div>
   );
 }

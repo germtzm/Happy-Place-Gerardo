@@ -13,7 +13,7 @@ export function BlockersSection({ isAdmin, onOpenArchive }: { isAdmin: boolean; 
   });
 
   return (
-    <section className="col-span-12 md:col-span-7 bg-surface-container-lowest border border-outline-variant p-md">
+    <section className="col-span-12 md:col-span-7 rounded-[8px] bg-surface-container-lowest border border-outline-variant p-md">
       <div className="flex items-center justify-between mb-md">
         <div className="flex items-center gap-sm">
           <h2 className="font-headline-sm text-headline-sm text-primary">Points Bloquants</h2>
@@ -30,14 +30,14 @@ export function BlockersSection({ isAdmin, onOpenArchive }: { isAdmin: boolean; 
            VOIR L'ARCHIVE
         </button>
       </div>
-      <div className="space-y-sm">
+      <div className="grid auto-rows-fr grid-cols-1 items-stretch gap-sm xl:grid-cols-2">
         {blockers.isError && (
-          <p className="text-body-sm text-error">
+          <p className="col-span-full text-body-sm text-error">
             Les points bloquants sont indisponibles.
           </p>
         )}
         {blockers.data?.length === 0 && (
-          <p className="text-body-sm text-on-surface-variant italic">
+          <p className="col-span-full text-body-sm text-on-surface-variant italic">
             Aucun point bloquant en cours.
           </p>
         )}
@@ -46,9 +46,9 @@ export function BlockersSection({ isAdmin, onOpenArchive }: { isAdmin: boolean; 
           return (
             <div
               key={b.id}
-              className={`${critical ? "accent-bar " : ""}bg-card border border-outline-variant p-sm flex items-start justify-between`}
+              className={`${critical ? "accent-bar " : ""}flex min-h-28 min-w-0 flex-col gap-sm overflow-hidden rounded-[8px] border border-outline-variant bg-card p-sm sm:flex-row sm:items-stretch sm:justify-between`}
             >
-              <div className="flex gap-md">
+              <div className="flex min-w-0 flex-1 gap-md">
                 <Icon
                   name={critical ? "error" : "warning"}
                   className={
@@ -57,9 +57,11 @@ export function BlockersSection({ isAdmin, onOpenArchive }: { isAdmin: boolean; 
                       : "text-secondary mt-1"
                   }
                 />
-                <div>
-                  <p className="font-body-md text-primary font-bold">{b.title}</p>
-                  <p className="text-body-sm text-on-surface-variant">{b.description}</p>
+                <div className="min-w-0">
+                  <p className="font-body-md text-primary font-bold wrap-anywhere">{b.title}</p>
+                  <p className="line-clamp-3 text-body-sm text-on-surface-variant wrap-anywhere">
+                    {b.description}
+                  </p>
                   <div className="flex items-center gap-sm mt-xs">
                     <span className="text-[11px] font-label-sm bg-surface-container-highest px-xs py-0.5">
                       {b.department}
@@ -70,23 +72,25 @@ export function BlockersSection({ isAdmin, onOpenArchive }: { isAdmin: boolean; 
                   </div>
                 </div>
               </div>
-              <select
-                aria-label={`Statut de ${b.title}`}
-                value={b.status}
-                disabled={!isAdmin}
-                onChange={(e) => setBlocker.mutate({ id: b.id, status: e.target.value })}
-                className={`bg-transparent border-none text-xs font-label-sm focus:outline-none cursor-pointer ${critical ? "text-error" : "text-on-surface-variant"}`}
-              >
-                <option>OUVERT</option>
-                <option>EN COURS</option>
-                <option>SURVEILLANCE</option>
-                <option
-                  disabled={b.status === "OUVERT"}
-                  title={b.status === "OUVERT" ? "Passe d'abord par EN COURS" : undefined}
+              <div className="flex shrink-0 items-center sm:justify-end">
+                <select
+                  aria-label={`Statut de ${b.title}`}
+                  value={b.status}
+                  disabled={!isAdmin}
+                  onChange={(e) => setBlocker.mutate({ id: b.id, status: e.target.value })}
+                  className={`min-h-[44px] bg-transparent border-none text-xs font-label-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer max-sm:w-full ${critical ? "text-error" : "text-on-surface-variant"}`}
                 >
-                  RÉSOLU
-                </option>
-              </select>
+                  <option>OUVERT</option>
+                  <option>EN COURS</option>
+                  <option>SURVEILLANCE</option>
+                  <option
+                    disabled={b.status === "OUVERT"}
+                    title={b.status === "OUVERT" ? "Passe d'abord par EN COURS" : undefined}
+                  >
+                    RÉSOLU
+                  </option>
+                </select>
+              </div>
             </div>
           );
         })}

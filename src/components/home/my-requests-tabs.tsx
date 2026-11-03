@@ -96,7 +96,7 @@ export function MyRequestsSections({
       // « Soumettre une demande » et « Exporter le rapport » : dans l'en-tête de la section En attente.
       titleAside: t.id === "en-attente" ? <RequestActions /> : undefined,
       panel: (
-        <div className="grid grid-cols-1 items-start gap-xs xl:grid-cols-2">
+        <div className="grid auto-rows-fr grid-cols-1 items-start gap-xs xl:grid-cols-2">
           {mine.isLoading && (
             <p className="col-span-full text-body-sm text-on-surface-variant">Chargement…</p>
           )}

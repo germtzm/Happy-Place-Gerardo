@@ -25,7 +25,7 @@ export function DepartureNotices({ email }: { email: string }) {
   }
   if (!q.data) return <p className="text-body-sm text-on-surface-variant">Chargement…</p>;
   return (
-    <div className="space-y-xs">
+    <div className="grid grid-cols-1 items-stretch gap-xs xl:grid-cols-2">
       {q.data.map((n) => (
         <NoticeBanner key={n.id} notice={n} email={email} />
       ))}
@@ -66,21 +66,54 @@ function NoticeBanner({ notice: n, email }: { notice: DepartureNotice; email: st
     }
   }
 
-  const btn = "px-sm py-1 border border-outline text-primary font-label-sm text-label-sm hover:bg-surface-container disabled:opacity-50";
+  const btn =
+    "flex min-h-[44px] w-full items-center justify-center px-sm py-1 border border-outline text-center text-primary font-label-sm text-label-sm hover:bg-surface-container disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:w-[11rem]";
 
   return (
     <div
       role={reminder ? "alert" : "status"}
-      className={`p-sm border space-y-xs ${reminder ? "border-[#72020E] bg-[#FED2CE] text-[#72020E]" : "border-outline-variant bg-surface-container-lowest"}`}
+      className={`flex min-h-28 min-w-0 flex-col gap-xs p-sm border sm:flex-row sm:items-stretch ${reminder ? "border-[#72020E] bg-[#FED2CE] text-[#72020E]" : "border-outline-variant bg-surface-container-lowest"}`}
     >
-      <p className="font-body-md">
-        {reminder && <strong>Rappel : </strong>}
-        {text}
-      </p>
-      <div className="flex flex-wrap gap-xs">
+      <div className="min-w-0 flex-1 space-y-xs">
+        <p className="font-body-md wrap-anywhere">
+          {reminder && <strong>Rappel : </strong>}
+          {text}
+        </p>
+        {open && (
+          <ul className="border-t border-outline-variant pt-xs space-y-xs">
+            {n.documents.map((d) => (
+              <li
+                key={d.path}
+                className="flex flex-wrap items-center justify-between gap-xs text-body-sm"
+              >
+                <span className="min-w-0 wrap-anywhere">
+                  <span className="font-bold">{frDate(d.created_at)}</span> — {d.excerpt}
+                </span>
+                <button
+                  type="button"
+                  className="min-h-[44px] text-primary underline font-label-sm text-label-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  onClick={() =>
+                    downloadAttachment(d.path, d.name).catch((e) =>
+                      toast.error((e as Error).message),
+                    )
+                  }
+                >
+                  Télécharger
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="flex shrink-0 flex-col justify-center gap-xs sm:items-end">
         {count > 0 && (
           <>
-            <button type="button" className={btn} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+            <button
+              type="button"
+              className={btn}
+              onClick={() => setOpen((o) => !o)}
+              aria-expanded={open}
+            >
               {open ? "Masquer les documents" : "Voir les documents"}
             </button>
             <button type="button" className={btn} onClick={zipAll} disabled={zipping}>
@@ -88,28 +121,15 @@ function NoticeBanner({ notice: n, email }: { notice: DepartureNotice; email: st
             </button>
           </>
         )}
-        <button type="button" className={btn} onClick={() => mark.mutate()} disabled={mark.isPending}>
+        <button
+          type="button"
+          className={btn}
+          onClick={() => mark.mutate()}
+          disabled={mark.isPending}
+        >
           {count > 0 ? "J'ai téléchargé les documents" : "J'ai pris note"}
         </button>
       </div>
-      {open && (
-        <ul className="border-t border-outline-variant pt-xs space-y-xs">
-          {n.documents.map((d) => (
-            <li key={d.path} className="flex flex-wrap items-center justify-between gap-xs text-body-sm">
-              <span>
-                <span className="font-bold">{frDate(d.created_at)}</span> — {d.excerpt}
-              </span>
-              <button
-                type="button"
-                className="text-primary underline font-label-sm text-label-sm"
-                onClick={() => downloadAttachment(d.path, d.name).catch((e) => toast.error((e as Error).message))}
-              >
-                Télécharger
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

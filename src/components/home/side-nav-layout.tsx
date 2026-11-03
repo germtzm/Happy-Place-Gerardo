@@ -8,9 +8,11 @@ import { SideNav, type SideNavItem } from "./side-nav";
 export type TitleAside = ReactNode | ((focusTitle: () => void) => ReactNode);
 
 /**
- * Page à menu latéral : le menu à gauche (au-dessus du contenu en dessous de md), la section active à
- * droite sous son titre. Un lien d'évitement mène au titre ; à chaque changement de section, le focus
- * va au titre (tabIndex -1). Pas de focus au premier affichage.
+ * Page à menu latéral : le menu collé au bord gauche de la fenêtre (au-dessus du contenu en dessous de
+ * md), la section active à droite sous son titre, à largeur maximale centrée dans l'espace restant. Le
+ * composant doit être posé hors d'un conteneur centré, sinon le rail ne touche pas le bord. Un lien
+ * d'évitement mène au titre ; à chaque changement de section, le focus va au titre (tabIndex -1).
+ * Pas de focus au premier affichage.
  *
  * Exemple (la section active est un état React, pas une URL) :
  *
@@ -54,9 +56,23 @@ export function SideNavLayout({
 
   const active = [...items, ...bottomItems].find((i) => i.id === activeId);
   const title = active?.title ?? active?.label ?? "";
+  const hideTitle = !!active?.hideTitle;
+  const hasAside = titleAside !== undefined && titleAside !== null && titleAside !== false;
+  const heading = (
+    <h1
+      id={titleId}
+      ref={titleRef}
+      tabIndex={-1}
+      className={`scroll-mt-[var(--home-header-h,4rem)] font-headline-sm text-headline-sm text-primary focus:outline-none ${
+        hideTitle ? "sr-only" : ""
+      }`}
+    >
+      {title}
+    </h1>
+  );
 
   return (
-    <div className="relative flex flex-col md:flex-row md:items-stretch md:gap-md">
+    <div className="relative flex flex-col md:flex-row md:items-stretch">
       <a
         href="#contenu-principal"
         onClick={(e) => {
@@ -71,21 +87,24 @@ export function SideNavLayout({
       <section
         id="contenu-principal"
         aria-labelledby={titleId}
-        className="min-w-0 flex-1 space-y-md pt-md md:pt-0"
+        className="mx-auto w-full min-w-0 max-w-interface flex-1 space-y-md px-sm py-md md:p-md"
       >
-        <div className="flex flex-wrap items-center justify-between gap-sm">
-          <h2
-            id={titleId}
-            ref={titleRef}
-            tabIndex={-1}
-            className="font-headline-sm text-headline-sm text-primary focus:outline-none"
+        {hideTitle && !hasAside ? (
+          // Titre invisible et rien à droite : pas de rangée, donc aucun espace vertical vide.
+          heading
+        ) : (
+          // Titre masqué : la rangée ne contient que l'élément de droite, aligné à droite.
+          <div
+            className={`flex flex-wrap items-center gap-sm ${
+              hideTitle ? "justify-end" : "justify-between"
+            }`}
           >
-            {title}
-          </h2>
-          {typeof titleAside === "function"
-            ? titleAside(() => titleRef.current?.focus())
-            : titleAside}
-        </div>
+            {heading}
+            {typeof titleAside === "function"
+              ? titleAside(() => titleRef.current?.focus())
+              : titleAside}
+          </div>
+        )}
         {children}
       </section>
     </div>

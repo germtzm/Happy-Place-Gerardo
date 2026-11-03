@@ -14,7 +14,7 @@ export function NotificationBell({ email, onOpen }: { email: string; onOpen: () 
       id="notification-bell"
       onClick={onOpen}
       aria-label={`Notifications, ${count} non lue${count > 1 ? "s" : ""}`}
-      className="relative flex items-center p-xs text-primary hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      className="relative flex min-h-[44px] min-w-[44px] items-center justify-center p-xs text-primary hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     >
       <Icon name="notifications" />
       {count > 0 && (

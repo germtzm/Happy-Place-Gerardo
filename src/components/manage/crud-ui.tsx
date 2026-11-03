@@ -86,10 +86,12 @@ export function FormActions({
   pending,
   onCancel,
   submitLabel = "ENREGISTRER",
+  pendingLabel = "…",
 }: {
   pending?: boolean;
   onCancel: () => void;
   submitLabel?: string;
+  pendingLabel?: string;
 }) {
   return (
     <div className="flex justify-end gap-xs pt-sm">
@@ -105,7 +107,7 @@ export function FormActions({
         disabled={pending}
         className="px-lg py-xs bg-primary text-on-primary font-label-md text-label-md disabled:opacity-50"
       >
-        {pending ? "…" : submitLabel}
+        {pending ? pendingLabel : submitLabel}
       </button>
     </div>
   );

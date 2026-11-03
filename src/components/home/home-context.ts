@@ -1,4 +1,5 @@
 import { createContext } from "react";
+import type { SideNavItem } from "./side-nav";
 
 /**
  * Navigation et actions de l'accueil, fournies par la page d'accueil. La section active vit là, et
@@ -12,6 +13,8 @@ export type HomeContextValue = {
   /** Génère le rapport de mes soumissions. */
   onExport: () => void;
   exporting: boolean;
+  /** Entrées d'action du bas du rail (Données pour l'admin, Déconnexion pour tous), après les sections. */
+  railActions: SideNavItem[];
 };
 
 export const HomeContext = createContext<HomeContextValue>({
@@ -20,4 +23,5 @@ export const HomeContext = createContext<HomeContextValue>({
   onSubmitRequest: () => {},
   onExport: () => {},
   exporting: false,
+  railActions: [],
 });
