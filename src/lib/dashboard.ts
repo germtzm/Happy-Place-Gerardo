@@ -3,6 +3,7 @@ import type { Database, Json } from "@/integrations/supabase/types";
 import { applyNewsImage, removeNewsImageFile, type MediaDraft, type NewsLink } from "@/lib/news-media";
 import { supabase } from "@/integrations/supabase/client";
 import type { AttachmentChange } from "@/lib/own-submission";
+import { formatDepartureDay, sortTeamDepartures, type TeamDeparture } from "@/lib/team-departures";
 
 export const db = supabase;
 
@@ -997,6 +998,25 @@ export async function fetchMyDepartureNotices(email: string): Promise<DepartureN
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as DepartureNotice[];
+}
+
+// Type, format et tri vivent dans un module pur (sans client Supabase), ré-exportés ici.
+export { formatDepartureDay, sortTeamDepartures, type TeamDeparture };
+
+// Les types générés ne connaissent pas encore cette fonction : appel typé à la main.
+type TeamDeparturesRpcClient = {
+  rpc: (
+    fn: "my_team_departures",
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+};
+
+/** Départs ouverts des équipes du manager (la base refuse les autres rôles et filtre par équipe). */
+export async function fetchMyTeamDepartures(): Promise<TeamDeparture[]> {
+  const { data, error } = await (supabase as unknown as TeamDeparturesRpcClient).rpc(
+    "my_team_departures",
+  );
+  if (error) throw new Error(error.message);
+  return sortTeamDepartures((data ?? []) as TeamDeparture[]);
 }
 
 export async function markDepartureNoticeDownloaded(id: string) {

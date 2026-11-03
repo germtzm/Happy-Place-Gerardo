@@ -1,5 +1,6 @@
 import { DepartureNotices } from "@/components/departure-notices";
 import { StaffHome } from "./staff-home";
+import { SECTION_CLS, TITLE_CLS, TeamDeparturesList } from "./team-departures-list";
 import type { HomeProps } from "./types";
 
 export function ManagerHome(props: HomeProps) {
@@ -12,12 +13,13 @@ export function ManagerHome(props: HomeProps) {
         shortLabel: "Personnel",
         icon: "badge",
         panel: (
-          <section className="min-w-0 space-y-xs rounded-[8px] border border-[#CDCDD1] bg-surface-container-lowest p-md">
-            <h2 className="mb-sm border-b border-[#CDCDD1] pb-xs font-headline-sm text-headline-sm text-primary">
-              Départs de mes équipes
-            </h2>
-            <DepartureNotices email={props.email} />
-          </section>
+          <div className="space-y-md">
+            <section className={SECTION_CLS}>
+              <h2 className={TITLE_CLS}>Départs de mes équipes</h2>
+              <DepartureNotices email={props.email} />
+            </section>
+            <TeamDeparturesList title="Départs dans mes équipes" />
+          </div>
         ),
       }}
     />
