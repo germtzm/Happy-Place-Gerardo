@@ -99,7 +99,7 @@ export function MySubmissions({ email, onRead }: { email: string; onRead: (s: Su
       <h2 className="font-headline-sm text-headline-sm text-primary border-b border-outline-variant pb-sm mb-md">
         Mes soumissions
       </h2>
-      <div className="space-y-xs">
+      <div className="grid grid-cols-1 items-start gap-xs xl:grid-cols-2">
         {mine.data.map((s) => (
           <MySubmissionItem key={s.id} s={s} onRead={onRead} />
         ))}

@@ -10,6 +10,8 @@ export function AdminHome(props: HomeProps) {
       isAdmin
       management={{
         label: "Gestion des utilisateurs",
+        shortLabel: "Utilisateurs",
+        icon: "manage_accounts",
         panel: (
           <section className="min-w-0 space-y-xs rounded-[8px] border border-[#CDCDD1] bg-surface-container-lowest p-md">
             <div className="mb-sm flex flex-wrap items-center justify-between gap-sm border-b border-[#CDCDD1] pb-xs">

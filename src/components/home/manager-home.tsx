@@ -9,6 +9,8 @@ export function ManagerHome(props: HomeProps) {
       isAdmin={false}
       management={{
         label: "Gestion du personnel",
+        shortLabel: "Personnel",
+        icon: "badge",
         panel: (
           <section className="min-w-0 space-y-xs rounded-[8px] border border-[#CDCDD1] bg-surface-container-lowest p-md">
             <h2 className="mb-sm border-b border-[#CDCDD1] pb-xs font-headline-sm text-headline-sm text-primary">

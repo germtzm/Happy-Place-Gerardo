@@ -13,12 +13,20 @@ import { BlockersSection } from "./blockers-section";
 import { MetricsSection } from "./metrics-section";
 import { MySubmissions } from "./my-submissions";
 import { NewsSection } from "./news-section";
-import { PendingSubmissions } from "./pending-submissions";
-import { TabTiles, type TabTileDef } from "./tab-tiles";
+import { NewCountPill, PendingSubmissions } from "./pending-submissions";
+import { OVERVIEW_ID, plural } from "@/lib/side-nav";
+import { HomeSections, type HomeSection } from "./home-sections";
 import { HomeTopCards } from "./top-cards";
 import type { HomeProps } from "./types";
 
-export type ManagementTab = { label: string; panel: ReactNode };
+export type ManagementTab = {
+  /** Nom complet (titre de la section et nom accessible). */
+  label: string;
+  /** Libellé court et icône de l'entrée du menu. */
+  shortLabel: string;
+  icon: string;
+  panel: ReactNode;
+};
 
 /** Compteurs des tuiles, calculés sur les données réelles (mêmes clés de requête que les panneaux). */
 function useStaffCounts(email: string) {
@@ -46,7 +54,12 @@ function useStaffCounts(email: string) {
   };
 }
 
-/** Moitié basse manager/admin : cinq tuiles-onglets, seul le panneau actif est visible. */
+/** Nom accessible d'une entrée : son nom, puis le compteur et sa légende (rien tant qu'il charge). */
+function named(name: string, n: number | string, legend: string): string {
+  return typeof n === "number" ? `${name}, ${n} ${legend}` : name;
+}
+
+/** Accueil manager/admin : menu latéral (Vue d'ensemble puis cinq sections), seul le panneau actif est visible. */
 export function StaffHome({
   isAdmin,
   management,
@@ -54,15 +67,24 @@ export function StaffHome({
 }: HomeProps & { isAdmin: boolean; management: ManagementTab }) {
   const counts = useStaffCounts(p.email);
 
-  const tabs: TabTileDef[] = [
+  const sections: HomeSection[] = [
+    {
+      id: OVERVIEW_ID,
+      label: "Vue d'ensemble",
+      icon: "dashboard",
+      panel: <HomeTopCards onReadNews={p.onReadNews} />,
+    },
     {
       id: "demandes",
       label: "Demandes",
+      icon: "inbox",
       count: counts.pending,
-      caption: "à traiter",
+      ariaLabel: named("Demandes", counts.pending, "à traiter"),
+      titleAside: <NewCountPill count={typeof counts.pending === "number" ? counts.pending : 0} />,
       panel: (
         <div className="space-y-md">
           <PendingSubmissions
+            embedded
             canReview
             role={p.role}
             email={p.email}
@@ -82,9 +104,15 @@ export function StaffHome({
     },
     {
       id: "actualites",
-      label: "Actualités du cabinet",
+      label: "Actualités",
+      title: "Actualités du cabinet",
+      icon: "campaign",
       count: counts.drafts,
-      caption: "brouillons",
+      ariaLabel: named(
+        "Actualités du cabinet",
+        counts.drafts,
+        typeof counts.drafts === "number" ? plural(counts.drafts, "brouillon", "brouillons") : "",
+      ),
       panel: (
         <NewsSection
           isAdmin={isAdmin}
@@ -98,42 +126,49 @@ export function StaffHome({
     {
       id: "points-bloquants",
       label: "Points bloquants",
+      icon: "warning",
       count: counts.blockers,
-      caption: "ouverts",
+      ariaLabel: named(
+        "Points bloquants",
+        counts.blockers,
+        typeof counts.blockers === "number" ? plural(counts.blockers, "ouvert", "ouverts") : "",
+      ),
       panel: <BlockersSection isAdmin={isAdmin} onOpenArchive={p.onOpenArchive} />,
     },
     {
       id: "indicateurs",
-      label: "Indicateurs clés",
+      label: "Indicateurs",
+      title: "Indicateurs clés",
+      icon: "monitoring",
       count: counts.metrics,
-      caption: "publiés",
+      ariaLabel: named(
+        "Indicateurs clés",
+        counts.metrics,
+        typeof counts.metrics === "number" ? plural(counts.metrics, "publié", "publiés") : "",
+      ),
       panel: <MetricsSection isAdmin={isAdmin} />,
     },
     {
       id: "gestion",
-      label: management.label,
+      label: management.shortLabel,
+      title: management.label,
+      icon: management.icon,
       count: counts.departures,
-      caption:
-        counts.urgentDepartures > 0 ? (
-          <>
-            départs{" "}
-            <span className="rounded-[4px] bg-[#FED2CE] px-xs text-[#72020E]">
-              {counts.urgentDepartures} urgent{counts.urgentDepartures > 1 ? "s" : ""}
-            </span>
-          </>
-        ) : (
-          "départs"
-        ),
+      urgent: counts.urgentDepartures > 0,
+      ariaLabel:
+        named(
+          management.label,
+          counts.departures,
+          typeof counts.departures === "number"
+            ? plural(counts.departures, "départ", "départs")
+            : "",
+        ) +
+        (counts.urgentDepartures > 0
+          ? `, ${counts.urgentDepartures} ${plural(counts.urgentDepartures, "urgent", "urgents")}`
+          : ""),
       panel: management.panel,
     },
   ];
 
-  return (
-    <>
-      <HomeTopCards onReadNews={p.onReadNews} />
-      <div className="min-w-0">
-        <TabTiles tabs={tabs} ariaLabel="Sections de l'accueil" defaultId="demandes" />
-      </div>
-    </>
-  );
+  return <HomeSections sections={sections} defaultId="demandes" />;
 }

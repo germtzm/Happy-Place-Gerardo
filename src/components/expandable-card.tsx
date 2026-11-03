@@ -41,7 +41,16 @@ export function formatExactDate(iso: string) {
  * Aperçu sur 3 lignes. « Voir plus » n'apparaît que si le texte dépasse
  * réellement 3 lignes (recalculé au redimensionnement) et ouvre la fenêtre de lecture.
  */
-export function SubmissionPreview({ content, onOpen }: { content: string; onOpen: () => void }) {
+export function SubmissionPreview({
+  content,
+  onOpen,
+  emphasis = false,
+}: {
+  content: string;
+  onOpen: () => void;
+  /** Texte au premier plan (14 px, #232428) pour les demandes à traiter ; les autres listes gardent le rendu discret. */
+  emphasis?: boolean;
+}) {
   const ref = useRef<HTMLParagraphElement>(null);
   const [overflows, setOverflows] = useState(false);
 
@@ -59,7 +68,11 @@ export function SubmissionPreview({ content, onOpen }: { content: string; onOpen
     <div className="min-w-0 space-y-xs">
       <p
         ref={ref}
-        className="font-body-sm text-body-sm italic text-on-surface-variant whitespace-pre-line wrap-anywhere line-clamp-3"
+        className={`font-body-sm italic whitespace-pre-line wrap-anywhere line-clamp-3 ${
+          emphasis
+            ? "text-[14px] leading-[1.5] text-[#232428]"
+            : "text-body-sm text-on-surface-variant"
+        }`}
       >
         “<Linkify text={content} />”
       </p>

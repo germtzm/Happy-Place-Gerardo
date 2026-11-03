@@ -4,25 +4,48 @@ import {
   fetchValidatedSubmissions,
   fetchValidators,
   fetchWaitingSince,
+  type News,
   type Submission,
 } from "@/lib/dashboard";
 import { ValidatedSubmissions } from "@/components/dashboard-extras";
 import { MySubmissionItem } from "./my-submissions";
-import { TabTiles, type TabTileDef } from "./tab-tiles";
+import { OVERVIEW_ID, plural } from "@/lib/side-nav";
+import { HomeSections, type HomeSection } from "./home-sections";
+import { HomeTopCards } from "./top-cards";
 
 const TABS = [
-  { id: "en-attente", status: "en attente", label: "En attente" },
-  { id: "validee", status: "validée", label: "Validées" },
-  { id: "refusee", status: "refusée", label: "Refusées" },
+  {
+    id: "en-attente",
+    status: "en attente",
+    label: "En attente",
+    icon: "hourglass_top",
+    title: "Mes demandes en attente",
+  },
+  {
+    id: "validee",
+    status: "validée",
+    label: "Validées",
+    icon: "check_circle",
+    title: "Mes demandes validées",
+  },
+  {
+    id: "refusee",
+    status: "refusée",
+    label: "Refusées",
+    icon: "cancel",
+    title: "Mes demandes refusées",
+  },
 ] as const;
 
-/** Moitié basse du collaborateur : ses demandes, une tuile-onglet par valeur de submission_status. */
-export function MyRequestsTabs({
+/** Accueil du collaborateur : menu latéral (Vue d'ensemble, une entrée par valeur de submission_status, puis l'équipe). */
+export function MyRequestsSections({
   email,
   onRead,
+  onReadNews,
 }: {
   email: string;
   onRead: (s: Submission) => void;
+  onReadNews: (n: News) => void;
 }) {
   const mine = useQuery({
     queryKey: ["submissions", "mine", "all", email],
@@ -53,12 +76,15 @@ export function MyRequestsTabs({
     retry: false,
   });
 
-  const tabs: TabTileDef[] = TABS.map((t) => {
+  const sections: HomeSection[] = TABS.map((t) => {
     const items = mine.data?.filter((s) => s.status === t.status) ?? [];
     return {
       id: t.id,
       label: t.label,
+      title: t.title,
+      icon: t.icon,
       count: items.length,
+      ariaLabel: `${t.label}, ${items.length} ${plural(items.length, "demande", "demandes")}`,
       panel: (
         <>
           {mine.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
@@ -83,10 +109,23 @@ export function MyRequestsTabs({
       ),
     };
   });
-  tabs.push({
+  sections.unshift({
+    id: OVERVIEW_ID,
+    label: "Vue d'ensemble",
+    icon: "dashboard",
+    panel: <HomeTopCards onReadNews={onReadNews} />,
+  });
+  const teamCount = teamValidated.data?.length;
+  sections.push({
     id: "equipe",
-    label: "Validées de l'équipe",
-    count: teamValidated.data?.length ?? "–",
+    label: "Validées équipe",
+    title: "Validées de l'équipe",
+    icon: "groups",
+    count: teamCount ?? "–",
+    ariaLabel:
+      teamCount === undefined
+        ? "Validées de l'équipe"
+        : `Validées de l'équipe, ${teamCount} ${plural(teamCount, "demande", "demandes")}`,
     panel: (
       <ValidatedSubmissions
         embedded
@@ -98,17 +137,5 @@ export function MyRequestsTabs({
     ),
   });
 
-  return (
-    <section className="col-span-12 min-w-0 bg-surface-container-lowest border border-outline-variant p-md">
-      <h2 className="font-headline-sm text-headline-sm text-primary border-b border-outline-variant pb-sm mb-md">
-        Mes demandes
-      </h2>
-      <TabTiles
-        tabs={tabs}
-        ariaLabel="Statut de mes demandes"
-        defaultId="en-attente"
-        gridClassName="grid-cols-2 md:grid-cols-4"
-      />
-    </section>
-  );
+  return <HomeSections sections={sections} defaultId="en-attente" />;
 }
