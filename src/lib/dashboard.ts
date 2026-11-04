@@ -586,6 +586,32 @@ export async function markAllNotificationsRead(): Promise<number> {
   return data?.length ?? 0;
 }
 
+/** Réponses de la fenêtre « Donner mon avis » ; `satisfaction` est obligatoire, le reste peut être vide. */
+export type FeedbackInput = {
+  satisfaction: number;
+  accueil?: number | null;
+  demandes?: number | null;
+  notifications?: number | null;
+  comment?: string | null;
+};
+
+/**
+ * Envoie un avis anonyme (fonction SQL `submit_feedback`, qui pose elle-même le rôle). Les cinq
+ * paramètres sont toujours envoyés, `null` pour un champ non rempli. Le type généré n'accepte pas
+ * `null` pour les paramètres facultatifs : appel typé à la main (voir rpcUntyped).
+ */
+export async function submitFeedback(input: FeedbackInput): Promise<void> {
+  const comment = input.comment?.trim();
+  const { error } = await rpcUntyped<null>("submit_feedback", {
+    p_satisfaction: input.satisfaction,
+    p_accueil: input.accueil ?? null,
+    p_demandes: input.demandes ?? null,
+    p_notifications: input.notifications ?? null,
+    p_comment: comment ? comment : null,
+  });
+  if (error) throw new Error(error.message);
+}
+
 /* ============================================================
  * Récapitulatif du manager (B04) — préférences d'envoi
  * ========================================================== */

@@ -11,6 +11,7 @@ import { BrandHeader } from "@/components/brand-header";
 import { CharCounter, rejectionErrorMessage } from "@/components/expandable-card";
 import { SubmissionReader } from "@/components/submission-reader";
 import { NewsReader } from "@/components/news-reader";
+import { FeedbackDialog } from "@/components/feedback-dialog";
 import { BlockerArchive } from "@/components/dashboard-extras";
 import { AdminHome } from "@/components/home/admin-home";
 import { CollaborateurHome } from "@/components/home/collaborateur-home";
@@ -103,6 +104,7 @@ function ManagerSpace() {
   const [reading, setReading] = useState<Submission | null>(null);
   const [readingNews, setReadingNews] = useState<News | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   // Section active du menu latéral : un seul état, partagé avec la cloche par HomeContext. À la
   // connexion et après rechargement, la Vue d'ensemble, pour tous les profils.
   const [activeSection, setActiveSection] = useState(OVERVIEW_ID);
@@ -286,6 +288,13 @@ function ManagerSpace() {
         ]
       : []),
     {
+      id: "action-avis",
+      label: "Donner mon avis",
+      ariaLabel: "Donner mon avis",
+      icon: "rate_review",
+      onSelect: () => setFeedbackOpen(true),
+    },
+    {
       id: "action-deconnexion",
       label: "Déconnexion",
       ariaLabel: "Se déconnecter",
@@ -406,6 +415,7 @@ function ManagerSpace() {
       </main>
       <BlockerArchive open={archiveOpen} onClose={() => setArchiveOpen(false)} />
       <NewsReader news={readingNews} onClose={() => setReadingNews(null)} />
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
       <SubmissionReader
         submission={reading}
         onClose={() => setReading(null)}
