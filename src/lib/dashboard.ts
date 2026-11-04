@@ -911,25 +911,35 @@ export async function replaceMetricTeams(metricKey: string, teams: string[]) {
   }
 }
 
-export type MyTeamScope = { isAdmin: boolean; teams: string[] };
+export type MyTeamScope = {
+  isAdmin: boolean;
+  /** Rôle du connecté ; null si son compte est introuvable. */
+  role: Enums["app_role"] | null;
+  teams: string[];
+};
 
 /** Équipes proposées par le sélecteur : la sienne et ses manager_teams ; toutes (hors Admin) pour l'admin. */
 export async function fetchMyTeamScope(): Promise<MyTeamScope> {
   const { data: session } = await db.auth.getSession();
   const email = session.session?.user.email?.toLowerCase();
-  if (!email) return { isAdmin: false, teams: [] };
+  if (!email) return { isAdmin: false, role: null, teams: [] };
   const { data, error } = await db
     .from("allowed_users")
     .select("team, allowed_user_roles(role), manager_teams(team)")
     .eq("email", email)
     .maybeSingle();
   if (error) throw error;
-  if (!data) return { isAdmin: false, teams: [] };
-  if (data.allowed_user_roles?.role === "admin") {
-    return { isAdmin: true, teams: await fetchSelectableTeams() };
+  if (!data) return { isAdmin: false, role: null, teams: [] };
+  const role = data.allowed_user_roles?.role ?? null;
+  if (role === "admin") {
+    return { isAdmin: true, role, teams: await fetchSelectableTeams() };
   }
   const own = data.team ? [data.team] : [];
-  return { isAdmin: false, teams: sortTeams([...own, ...data.manager_teams.map((t) => t.team)]) };
+  return {
+    isAdmin: false,
+    role,
+    teams: sortTeams([...own, ...data.manager_teams.map((t) => t.team)]),
+  };
 }
 
 export async function createBlocker(input: BlockerInput, teams?: string[]) {

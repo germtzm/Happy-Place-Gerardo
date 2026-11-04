@@ -1,6 +1,6 @@
 import { useEffect, useId } from "react";
 import { TEAM_FILTER_ALL } from "@/lib/home-lists";
-import { setTeamFilter, useTeamFilter, useTeamScope } from "./use-team-filter";
+import { canPickTeam, setTeamFilter, useTeamFilter, useTeamScope } from "./use-team-filter";
 
 /**
  * Sélecteur « Équipe » des indicateurs et des points bloquants. La base ne renvoie déjà que ce que le
@@ -19,7 +19,7 @@ export function TeamFilter({ className = "" }: { className?: string }) {
     }
   }, [scope.data, team]);
 
-  if (!scope.data || teams.length === 0) return null;
+  if (!scope.data || !canPickTeam(scope.data)) return null;
 
   return (
     <div className={`flex flex-wrap items-center gap-xs ${className}`}>

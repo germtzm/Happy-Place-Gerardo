@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
-import { fetchMyTeamScope } from "@/lib/dashboard";
+import { fetchMyTeamScope, type MyTeamScope } from "@/lib/dashboard";
 import { TEAM_FILTER_ALL } from "@/lib/home-lists";
 
 /**
@@ -30,6 +30,14 @@ export function useTeamFilter(): [string, (team: string) => void] {
     () => TEAM_FILTER_ALL,
   );
   return [team, setTeamFilter];
+}
+
+/**
+ * Le sélecteur n'est proposé qu'aux managers et aux admins, et seulement s'il y a une équipe à choisir.
+ * Les collaborateurs n'en ont pas besoin : la base les limite déjà à leur équipe et aux éléments sans équipe.
+ */
+export function canPickTeam(scope: MyTeamScope | undefined): boolean {
+  return !!scope && (scope.role === "admin" || scope.role === "manager") && scope.teams.length > 0;
 }
 
 /** Équipes proposées au connecté (la sienne et ses manager_teams ; toutes pour l'admin). */

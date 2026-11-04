@@ -13,7 +13,7 @@ import { FullViewContext, type FullView } from "./full-view-context";
 import { Icon } from "./icon";
 import { formatMetric, metricLabel, trendText } from "./metrics-format";
 import { TeamFilter } from "./team-filter";
-import { useTeamFilter, useTeamScope } from "./use-team-filter";
+import { canPickTeam, useTeamFilter, useTeamScope } from "./use-team-filter";
 
 const BLOCKERS_SHOWN = 3;
 const METRICS_SHOWN = 3;
@@ -69,7 +69,7 @@ export function HomeTopCards({ onReadNews }: { onReadNews: (n: News) => void }) 
   const metrics = useQuery({ queryKey: ["metrics"], queryFn: fetchMetrics, retry: false });
   const [team] = useTeamFilter();
   const scope = useTeamScope();
-  const showFilter = (scope.data?.teams.length ?? 0) > 0;
+  const showFilter = canPickTeam(scope.data);
   const latest = news.data?.filter((n) => n.status === "publiée").slice(0, 2) ?? [];
   const shownBlockers = filterByTeam(blockers.data ?? [], team).slice(0, BLOCKERS_SHOWN);
   const shownMetrics = filterByTeam(metrics.data ?? [], team).slice(0, METRICS_SHOWN);
