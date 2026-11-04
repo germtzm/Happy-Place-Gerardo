@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { flattenNavItems } from "@/lib/side-nav";
 import { SideNav, type SideNavItem } from "./side-nav";
 
 /**
@@ -8,9 +9,10 @@ import { SideNav, type SideNavItem } from "./side-nav";
 export type TitleAside = ReactNode | ((focusTitle: () => void) => ReactNode);
 
 /**
- * Page à menu latéral : le menu collé au bord gauche de la fenêtre (sous md, un bouton « Menu » au-dessus
- * du contenu déroule la liste), la section active à droite sous son titre, à largeur maximale centrée
- * dans l'espace restant. Le
+ * Page à menu latéral : le menu large (232 px) collé au bord gauche de la fenêtre à partir de lg (sous lg,
+ * un bouton « Menu » au-dessus du contenu déroule la liste), la section active à droite sous son titre, à
+ * largeur maximale centrée dans l'espace restant. Une entrée peut être un groupe dépliable (`children`),
+ * jamais la section active. Le
  * composant doit être posé hors d'un conteneur centré, sinon le rail ne touche pas le bord. Un lien
  * d'évitement mène au titre ; à chaque changement de section, le focus va au titre (tabIndex -1).
  * Pas de focus au premier affichage.
@@ -55,7 +57,7 @@ export function SideNavLayout({
     titleRef.current?.focus();
   }, [activeId]);
 
-  const active = [...items, ...bottomItems].find((i) => i.id === activeId);
+  const active = flattenNavItems([...items, ...bottomItems]).find((i) => i.id === activeId);
   const title = active?.title ?? active?.label ?? "";
   const hideTitle = !!active?.hideTitle;
   const hasAside = titleAside !== undefined && titleAside !== null && titleAside !== false;
@@ -73,7 +75,7 @@ export function SideNavLayout({
   );
 
   return (
-    <div className="relative flex flex-col md:flex-row md:items-stretch">
+    <div className="relative flex flex-col lg:flex-row lg:items-stretch">
       <a
         href="#contenu-principal"
         onClick={(e) => {
@@ -88,7 +90,7 @@ export function SideNavLayout({
       <section
         id="contenu-principal"
         aria-labelledby={titleId}
-        className="mx-auto w-full min-w-0 max-w-interface flex-1 space-y-md px-sm py-md md:p-md"
+        className="mx-auto w-full min-w-0 max-w-interface flex-1 space-y-md px-sm py-md lg:p-md"
       >
         {hideTitle && !hasAside ? (
           // Titre invisible et rien à droite : pas de rangée, donc aucun espace vertical vide.

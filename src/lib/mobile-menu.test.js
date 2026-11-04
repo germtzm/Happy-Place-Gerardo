@@ -47,6 +47,49 @@ describe("menuEntries", () => {
     expect(shape(menuEntries([section("a"), section("b")], []))).toEqual(["a", "sep-first", "b"]);
   });
 
+  test("les enfants d'un groupe suivent leur groupe, avec parentId", () => {
+    const group = { id: "demandes", children: [section("nouvelle"), section("suivi")] };
+    const entries = menuEntries([section("apercu"), group, section("actus")], [action("sortir")]);
+    expect(shape(entries)).toEqual([
+      "apercu",
+      "sep-first",
+      "demandes",
+      "nouvelle",
+      "suivi",
+      "actus",
+      "sep-groups",
+      "sortir",
+    ]);
+    const parents = entries.map((e) => (e.type === "item" ? e.parentId : undefined));
+    expect(parents).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      "demandes",
+      "demandes",
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
+  test("un groupe en première position : séparateur après lui et ses enfants", () => {
+    const group = { id: "g", children: [section("a")] };
+    expect(shape(menuEntries([group, section("b")], []))).toEqual(["g", "a", "sep-first", "b"]);
+  });
+
+  test("groupe dans le bas : enfants juste après lui, séparateur avant la première action", () => {
+    const group = { id: "g", children: [section("a")] };
+    expect(shape(menuEntries([section("x")], [group, action("z")]))).toEqual([
+      "x",
+      "sep-groups",
+      "g",
+      "a",
+      "sep-z",
+      "z",
+    ]);
+  });
+
   test("les entrées d'action restent des entrées", () => {
     const entries = menuEntries([section("a")], [action("x")]);
     const last = entries[entries.length - 1];

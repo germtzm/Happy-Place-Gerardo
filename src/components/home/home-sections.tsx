@@ -1,16 +1,25 @@
 import { useContext, type ReactNode } from "react";
 import { HomeContext } from "./home-context";
+import { flattenNavItems, isNavGroup } from "@/lib/side-nav";
 import { SideNavLayout, type TitleAside } from "./side-nav-layout";
 import type { SideNavItem } from "./side-nav";
 
-export type HomeSection = SideNavItem & {
-  panel: ReactNode;
+export type HomeSection = Omit<SideNavItem, "children"> & {
+  /** Panneau de la section ; absent pour un groupe, qui n'a ni panneau ni titre. */
+  panel?: ReactNode;
   /** Affiché à droite du titre quand la section est active. */
   titleAside?: TitleAside;
+  /** Sous-entrées : l'élément est alors un groupe dépliable. */
+  children?: HomeSection[];
 };
 
-function toItem({ panel: _panel, titleAside: _aside, ...item }: HomeSection): SideNavItem {
-  return item;
+function toItem({
+  panel: _panel,
+  titleAside: _aside,
+  children,
+  ...item
+}: HomeSection): SideNavItem {
+  return children ? { ...item, children: children.map(toItem) } : item;
 }
 
 /**
@@ -27,7 +36,8 @@ export function HomeSections({
   bottomSections?: HomeSection[];
 }) {
   const { activeId, onChange, railActions } = useContext(HomeContext);
-  const all = [...sections, ...bottomSections];
+  // À plat : les groupes ne portent pas de panneau, leurs enfants si.
+  const all = flattenNavItems([...sections, ...bottomSections]);
   const titleAside = all.find((s) => s.id === activeId)?.titleAside;
 
   return (
@@ -38,11 +48,13 @@ export function HomeSections({
       onChange={onChange}
       titleAside={titleAside}
     >
-      {all.map((s) => (
-        <div key={s.id} id={`section-${s.id}`} hidden={activeId !== s.id} className="space-y-xs">
-          {s.panel}
-        </div>
-      ))}
+      {all
+        .filter((s) => !isNavGroup(s))
+        .map((s) => (
+          <div key={s.id} id={`section-${s.id}`} hidden={activeId !== s.id} className="space-y-xs">
+            {s.panel}
+          </div>
+        ))}
     </SideNavLayout>
   );
 }

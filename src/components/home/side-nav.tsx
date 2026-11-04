@@ -1,11 +1,18 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { menuButtonLabel, menuEntries } from "@/lib/mobile-menu";
-import { nextNavIndex } from "@/lib/side-nav";
+import {
+  ancestorGroupIds,
+  flattenNavItems,
+  groupKeyAction,
+  isNavGroup,
+  nextNavIndex,
+  visibleNavIds,
+} from "@/lib/side-nav";
 import { Icon } from "./icon";
 
 export type SideNavItem = {
   id: string;
-  /** Libellé court affiché sous l'icône (retour à la ligne entre les mots seulement). */
+  /** Libellé affiché à côté de l'icône (retour à la ligne autorisé, jamais de troncature). */
   label: string;
   /** Nom accessible complet, par exemple « Demandes, 3 à traiter » ; à défaut, `label`. */
   ariaLabel?: string;
@@ -28,6 +35,11 @@ export type SideNavItem = {
    * la navigation aux flèches.
    */
   onSelect?: () => void;
+  /**
+   * Sous-entrées : l'élément est alors un groupe dépliable. Un groupe n'est jamais la section active,
+   * n'a ni `onSelect` ni titre de section ; ses enfants sont des entrées normales (sections ou actions).
+   */
+  children?: SideNavItem[];
 };
 
 type Props = {
@@ -36,6 +48,14 @@ type Props = {
   bottomItems?: SideNavItem[];
   activeId: string;
   onChange: (id: string) => void;
+};
+
+/** État des groupes dépliés, partagé entre le rail et le menu replié (état React local, jamais stocké). */
+type Shared = {
+  expanded: ReadonlySet<string>;
+  onToggle: (id: string) => void;
+  onSetOpen: (id: string, open: boolean) => void;
+  idPrefix: string;
 };
 
 /** Pastille affichée pour tout compteur fourni, sauf 0. */
@@ -55,19 +75,119 @@ function CountBadge({ item, className = "" }: { item: SideNavItem; className?: s
   );
 }
 
-const separatorCls = "h-auto w-px self-stretch bg-[#CDCDD1] md:h-px md:w-full md:self-auto";
+/**
+ * Contrastes (WCAG, texte normal 4,5 pour 1) : #28282D sur #EEEDEA 12,5 ; #28282D sur #F5F4F1 13,3 ;
+ * #55555A sur blanc 7,4, sur #F5F4F1 6,7 et sur #EEEDEA 6,3. L'anneau de focus #28282D est un indicateur
+ * de 2 px, sans texte.
+ */
+function rowCls(active: boolean, bold = false): string {
+  const state = active
+    ? "bg-[#EEEDEA] font-bold text-[#28282D]"
+    : `text-[#55555A] hover:bg-[#F5F4F1] hover:text-[#28282D] ${bold ? "font-bold" : ""}`;
+  return `flex min-h-[44px] w-full items-center gap-[10px] rounded-[8px] px-[10px] py-[6px] text-left font-label-md text-label-md focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#28282D] ${state}`;
+}
+
+const separatorCls = "my-[2px] h-px w-full bg-[#CDCDD1]";
+
+type RowCtx = Shared & {
+  activeId: string;
+  onPick: (item: SideNavItem) => void;
+  setRef?: (id: string, el: HTMLButtonElement | null) => void;
+};
+
+type NodeProps = { item: SideNavItem; ctx: RowCtx; child?: boolean };
+
+function NavLeaf({ item, ctx, child = false }: NodeProps) {
+  const active = !item.onSelect && item.id === ctx.activeId;
+  return (
+    <li>
+      <button
+        type="button"
+        ref={(el) => ctx.setRef?.(item.id, el)}
+        aria-current={active ? "page" : undefined}
+        aria-label={item.ariaLabel}
+        onClick={() => ctx.onPick(item)}
+        className={rowCls(active)}
+      >
+        {item.icon && <Icon name={item.icon} size={child ? 18 : 20} className="shrink-0" />}
+        <span className="min-w-0 flex-1 wrap-anywhere">{item.label}</span>
+        {hasCount(item) && <CountBadge item={item} className="shrink-0 whitespace-nowrap" />}
+      </button>
+    </li>
+  );
+}
 
 /**
- * Sous md : bouton « Menu : section active » pleine largeur, qui déroule le même menu en liste verticale
- * (icône, libellé, compteur). Ce n'est pas une fenêtre modale : pas de piège de focus. Replié, le bloc est
- * `hidden` (hors de la tabulation) ; Échap le referme et rend le focus au bouton ; choisir une entrée le
- * referme (pour une section, le focus va ensuite au titre, voir SideNavLayout).
+ * Groupe : une ligne bouton (icône, libellé, chevron) et la liste de ses enfants, décalée de 18 px, avec un
+ * trait vertical de 1 px à gauche sur toute la hauteur et 6 px de retrait entre le trait et les lignes.
+ * Fermé, le groupe est `hidden` : ses enfants sont hors de la tabulation.
  */
-function MobileMenu({ items, bottomItems = [], activeId, onChange }: Props) {
+function NavGroup({ item, ctx, child = false }: NodeProps) {
+  const open = ctx.expanded.has(item.id);
+  const children = item.children ?? [];
+  const listId = `${ctx.idPrefix}-${item.id}`;
+  const holdsActive =
+    !open && flattenNavItems(children).some((c) => !c.onSelect && c.id === ctx.activeId);
+  return (
+    <li>
+      <button
+        type="button"
+        ref={(el) => ctx.setRef?.(item.id, el)}
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-label={item.ariaLabel}
+        onClick={() => ctx.onToggle(item.id)}
+        className={rowCls(false, holdsActive)}
+      >
+        {item.icon && <Icon name={item.icon} size={child ? 18 : 20} className="shrink-0" />}
+        <span className="min-w-0 flex-1 wrap-anywhere">{item.label}</span>
+        {hasCount(item) && <CountBadge item={item} className="shrink-0 whitespace-nowrap" />}
+        <Icon name={open ? "expand_less" : "expand_more"} size={20} className="shrink-0" />
+      </button>
+      <ul
+        id={listId}
+        hidden={!open}
+        className="ml-[18px] mt-[2px] space-y-[2px] border-l border-[#CDCDD1] pl-[6px]"
+      >
+        {children.map((c) => (
+          <NavNode key={c.id} item={c} ctx={ctx} child />
+        ))}
+      </ul>
+    </li>
+  );
+}
+
+function NavNode({ item, ctx, child = false }: NodeProps) {
+  return isNavGroup(item) ? (
+    <NavGroup item={item} ctx={ctx} child={child} />
+  ) : (
+    <NavLeaf item={item} ctx={ctx} child={child} />
+  );
+}
+
+/**
+ * Sous lg : bouton « Menu : section active » pleine largeur, qui déroule le même menu en liste verticale
+ * (mêmes lignes, mêmes groupes dépliables et mêmes traits que le rail). Ce n'est pas une fenêtre modale :
+ * pas de piège de focus. Replié, le bloc est `hidden` (hors de la tabulation) ; Échap le referme et rend le
+ * focus au bouton ; choisir une entrée le referme (pour une section, le focus va ensuite au titre, voir
+ * SideNavLayout). Déplier un groupe ne referme pas le menu.
+ */
+function MobileMenu({
+  items,
+  bottomItems = [],
+  activeId,
+  onChange,
+  expanded,
+  onToggle,
+  onSetOpen,
+  idPrefix,
+}: Props & Shared) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const panelId = useId();
-  const active = [...items, ...bottomItems].find((i) => i.id === activeId && !i.onSelect);
+  const active = flattenNavItems([...items, ...bottomItems]).find(
+    (i) => i.id === activeId && !i.onSelect && !isNavGroup(i),
+  );
 
   // Un changement de section venu d'ailleurs (la cloche du bandeau) referme le menu.
   useEffect(() => {
@@ -93,11 +213,13 @@ function MobileMenu({ items, bottomItems = [], activeId, onChange }: Props) {
     button.current?.focus();
   }
 
+  const ctx: RowCtx = { activeId, expanded, onToggle, onSetOpen, idPrefix, onPick: choose };
+
   return (
     <nav
       aria-label="Sections de l'accueil"
       onKeyDown={onKeyDown}
-      className="border-b border-[#CDCDD1] bg-white md:hidden"
+      className="border-b border-[#CDCDD1] bg-white lg:hidden"
     >
       <button
         ref={button}
@@ -112,36 +234,14 @@ function MobileMenu({ items, bottomItems = [], activeId, onChange }: Props) {
         <Icon name={open ? "expand_less" : "expand_more"} className="shrink-0" />
       </button>
       <div id={panelId} hidden={!open} className="border-t border-[#CDCDD1]">
-        <ul className="space-y-[4px] px-[6px] py-[6px]">
+        <ul className="space-y-[2px] px-[8px] py-[8px]">
           {menuEntries(items, bottomItems).map((entry) => {
             if (entry.type === "separator") {
-              return (
-                <li key={entry.key} aria-hidden="true" className="my-[2px] h-px bg-[#CDCDD1]" />
-              );
+              return <li key={entry.key} aria-hidden="true" className={separatorCls} />;
             }
-            const item = entry.item;
-            const isActive = !item.onSelect && item.id === activeId;
-            return (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  aria-current={isActive ? "page" : undefined}
-                  aria-label={item.ariaLabel}
-                  onClick={() => choose(item)}
-                  className={`flex min-h-[44px] w-full items-center gap-sm rounded-[8px] px-sm py-xs text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#28282D] focus-visible:ring-offset-2 ${
-                    isActive ? "bg-[#28282D] text-[#F9F8F5]" : "text-[#55555A] hover:bg-[#EEEDEA]"
-                  }`}
-                >
-                  {item.icon && <Icon name={item.icon} className="shrink-0" />}
-                  <span className="min-w-0 flex-1 font-label-md text-label-md wrap-anywhere">
-                    {item.label}
-                  </span>
-                  {hasCount(item) && (
-                    <CountBadge item={item} className="shrink-0 whitespace-nowrap" />
-                  )}
-                </button>
-              </li>
-            );
+            // Les sous-entrées sont rendues par leur groupe, avec le trait vertical.
+            if (entry.parentId !== undefined) return null;
+            return <NavNode key={entry.item.id} item={entry.item} ctx={ctx} />;
           })}
         </ul>
       </div>
@@ -150,93 +250,148 @@ function MobileMenu({ items, bottomItems = [], activeId, onChange }: Props) {
 }
 
 /**
- * Menu latéral : rail de 96 px collé au bord gauche à partir de md ; au-dessous, un bouton « Menu » déroule
- * la liste (voir MobileMenu). Dans le rail, le groupe du haut défile, le groupe du bas reste épinglé.
- * Chaque entrée est un bouton, une tabulation chacune ; les flèches haut et bas, Début et Fin déplacent
- * le focus sans activer.
+ * Menu latéral façon Cloudflare : rail de 232 px collé au bord gauche à partir de lg, entrées en pleine
+ * largeur (icône et libellé complet), groupes dépliables dont les sous-entrées sont précédées d'un trait
+ * vertical ; au-dessous de lg, un bouton « Menu » déroule la liste (voir MobileMenu). Dans le rail, le
+ * groupe du haut défile, le groupe du bas reste épinglé. Chaque entrée est un bouton, une tabulation
+ * chacune ; les flèches haut et bas, Début et Fin déplacent le focus entre les entrées visibles sans
+ * activer ; Entrée ou Espace plie ou déplie un groupe ; flèche droite le déplie, flèche gauche le replie
+ * (depuis un enfant, elle ramène le focus sur son groupe).
  */
 export function SideNav(props: Props) {
+  const idPrefix = useId();
+  const all = [...props.items, ...(props.bottomItems ?? [])];
+  const activeGroups = ancestorGroupIds(all, props.activeId);
+  const activeGroupKey = activeGroups.join("\n");
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(activeGroups));
+
+  // Le groupe de l'entrée active se déplie quand elle change (par exemple depuis la cloche).
+  useEffect(() => {
+    if (!activeGroupKey) return;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      activeGroupKey.split("\n").forEach((id) => next.add(id));
+      return next;
+    });
+  }, [activeGroupKey, props.activeId]);
+
+  function onSetOpen(id: string, open: boolean) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function onToggle(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   return (
     <>
-      <MobileMenu {...props} />
-      <Rail {...props} />
+      <MobileMenu
+        {...props}
+        expanded={expanded}
+        onToggle={onToggle}
+        onSetOpen={onSetOpen}
+        idPrefix={`${idPrefix}-m`}
+      />
+      <Rail
+        {...props}
+        expanded={expanded}
+        onToggle={onToggle}
+        onSetOpen={onSetOpen}
+        idPrefix={`${idPrefix}-r`}
+      />
     </>
   );
 }
 
-function Rail({ items, bottomItems = [], activeId, onChange }: Props) {
+function Rail({
+  items,
+  bottomItems = [],
+  activeId,
+  onChange,
+  expanded,
+  onToggle,
+  onSetOpen,
+  idPrefix,
+}: Props & Shared) {
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const ids = [...items, ...bottomItems].map((i) => i.id);
+  const all = [...items, ...bottomItems];
+  const visible = visibleNavIds(all, expanded);
 
   function onKeyDown(e: KeyboardEvent<HTMLElement>) {
-    const current = ids.findIndex((id) => refs.current[id] === document.activeElement);
-    const next = nextNavIndex(ids.length, current, e.key);
-    if (next === null) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const current = visible.findIndex((id) => refs.current[id] === document.activeElement);
+    const next = nextNavIndex(visible.length, current, e.key);
+    if (next !== null) {
+      e.preventDefault();
+      refs.current[visible[next]]?.focus();
+      return;
+    }
+    if (current < 0) return;
+    const id = visible[current];
+    const entry = flattenNavItems(all).find((i) => i.id === id);
+    const parents = ancestorGroupIds(all, id);
+    const parentId = parents[parents.length - 1];
+    const action = groupKeyAction(e.key, {
+      isGroup: !!entry && isNavGroup(entry),
+      expanded: expanded.has(id),
+      hasParent: parentId !== undefined,
+    });
+    if (action === null) return;
     e.preventDefault();
-    refs.current[ids[next]]?.focus();
+    if (action === "expand") onSetOpen(id, true);
+    else if (action === "collapse") onSetOpen(id, false);
+    else if (parentId !== undefined) refs.current[parentId]?.focus();
   }
 
-  function renderItem(item: SideNavItem) {
-    const isAction = !!item.onSelect;
-    const active = !isAction && item.id === activeId;
-    return (
-      <li key={item.id} className="w-[88px] md:w-full">
-        <button
-          type="button"
-          ref={(el) => {
-            refs.current[item.id] = el;
-          }}
-          aria-current={active ? "page" : undefined}
-          aria-label={item.ariaLabel}
-          onClick={() => (item.onSelect ? item.onSelect() : onChange(item.id))}
-          className={`flex min-h-[64px] w-full flex-col items-center justify-center gap-[2px] rounded-[8px] px-0 py-xs text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#28282D] focus-visible:ring-offset-2 ${
-            active ? "bg-[#28282D] text-[#F9F8F5]" : "text-[#55555A] hover:bg-[#EEEDEA]"
-          }`}
-        >
-          {item.icon && (
-            <span className="relative inline-flex">
-              <Icon name={item.icon} />
-              {hasCount(item) && (
-                <CountBadge
-                  item={item}
-                  className="absolute -top-[6px] left-full -translate-x-[6px] whitespace-nowrap"
-                />
-              )}
-            </span>
-          )}
-          {!item.icon && hasCount(item) && <CountBadge item={item} />}
-          <span className="font-label-md text-[11px] leading-[1.15] tracking-normal break-normal hyphens-none">
-            {item.label}
-          </span>
-        </button>
-      </li>
-    );
-  }
+  const ctx: RowCtx = {
+    activeId,
+    expanded,
+    onToggle,
+    onSetOpen,
+    idPrefix,
+    onPick: (item) => (item.onSelect ? item.onSelect() : onChange(item.id)),
+    setRef: (id, el) => {
+      refs.current[id] = el;
+    },
+  };
 
   return (
     <nav
       aria-label="Sections de l'accueil"
       onKeyDown={onKeyDown}
-      className="hidden shrink-0 items-stretch border-[#CDCDD1] bg-white md:sticky md:top-[var(--home-header-h,4rem)] md:flex md:h-[calc(100dvh-var(--home-header-h,4rem))] md:w-[96px] md:flex-col md:flex-nowrap md:self-start md:overflow-hidden md:border-r"
+      className="hidden shrink-0 border-[#CDCDD1] bg-white lg:sticky lg:top-[var(--home-header-h,4rem)] lg:flex lg:h-[calc(100dvh-var(--home-header-h,4rem))] lg:w-[232px] lg:flex-col lg:self-start lg:overflow-hidden lg:border-r"
     >
-      <ul className="flex flex-wrap gap-[4px] px-[6px] py-[6px] md:min-h-0 md:flex-1 md:flex-col md:flex-nowrap md:overflow-y-auto md:overflow-x-hidden">
+      <ul className="min-h-0 flex-1 space-y-[2px] overflow-y-auto overflow-x-hidden px-[8px] py-[8px]">
         {items.flatMap((item, i) =>
           i === 0 && items.length > 1
-            ? [renderItem(item), <li key="sep-first" aria-hidden="true" className={separatorCls} />]
-            : [renderItem(item)],
+            ? [
+                <NavNode key={item.id} item={item} ctx={ctx} />,
+                <li key="sep-first" aria-hidden="true" className={separatorCls} />,
+              ]
+            : [<NavNode key={item.id} item={item} ctx={ctx} />],
         )}
       </ul>
       {bottomItems.length > 0 && (
         <>
-          <div aria-hidden="true" className={`${separatorCls} md:shrink-0`} />
-          <ul className="flex flex-wrap gap-[4px] px-[6px] py-[6px] md:shrink-0 md:flex-col md:flex-nowrap">
+          <div aria-hidden="true" className={`${separatorCls} shrink-0`} />
+          <ul className="shrink-0 space-y-[2px] px-[8px] py-[8px]">
             {bottomItems.flatMap((item, i) =>
               item.onSelect && i > 0 && !bottomItems[i - 1].onSelect
                 ? [
                     <li key={`sep-${item.id}`} aria-hidden="true" className={separatorCls} />,
-                    renderItem(item),
+                    <NavNode key={item.id} item={item} ctx={ctx} />,
                   ]
-                : [renderItem(item)],
+                : [<NavNode key={item.id} item={item} ctx={ctx} />],
             )}
           </ul>
         </>
