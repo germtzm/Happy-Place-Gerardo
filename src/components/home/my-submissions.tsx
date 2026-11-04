@@ -86,13 +86,41 @@ export function MySubmissionItem({
   );
 }
 
-export function MySubmissions({ email, onRead }: { email: string; onRead: (s: Submission) => void }) {
+export function MySubmissions({
+  email,
+  onRead,
+  embedded = false,
+}: {
+  email: string;
+  onRead: (s: Submission) => void;
+  /** Dans le menu latéral : ni cadre ni titre (fournis par la section), et jamais vide. */
+  embedded?: boolean;
+}) {
   const mine = useQuery({
     queryKey: ["submissions", "mine", email],
     queryFn: () => fetchMySubmissions(email ?? ""),
     enabled: !!email,
     retry: false,
   });
+
+  if (embedded) {
+    return (
+      <div className="min-w-0">
+        {mine.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
+        {mine.isError && (
+          <p className="text-body-sm text-error">Tes demandes sont indisponibles.</p>
+        )}
+        {mine.data?.length === 0 && (
+          <p className="text-body-sm text-on-surface-variant italic">Aucune demande soumise.</p>
+        )}
+        <div className="grid auto-rows-fr grid-cols-1 items-stretch gap-xs xl:grid-cols-2">
+          {mine.data?.map((s) => (
+            <MySubmissionItem key={s.id} s={s} onRead={onRead} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (!mine.data || mine.data.length === 0) return null;
 

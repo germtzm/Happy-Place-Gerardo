@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   fetchMySubmissions,
-  fetchValidatedSubmissions,
   fetchValidators,
   fetchWaitingSince,
   type News,
@@ -9,7 +8,7 @@ import {
 } from "@/lib/dashboard";
 import { ValidatedSubmissions } from "@/components/dashboard-extras";
 import { MySubmissionItem } from "./my-submissions";
-import { OVERVIEW_ID, plural } from "@/lib/side-nav";
+import { OVERVIEW_ID } from "@/lib/side-nav";
 import { HomeSections, type HomeSection } from "./home-sections";
 import { RequestActions } from "./request-actions";
 import { HomeTopCards } from "./top-cards";
@@ -39,7 +38,7 @@ const TABS = [
   },
 ] as const;
 
-/** Accueil du collaborateur : menu latéral (Vue d'ensemble, une entrée par valeur de submission_status, puis l'équipe). */
+/** Accueil du collaborateur : menu latéral (Vue d'ensemble, groupe Demandes : une entrée par valeur de submission_status, puis l'équipe). */
 export function MyRequestsSections({
   email,
   onRead,
@@ -71,28 +70,19 @@ export function MyRequestsSections({
     retry: false,
   });
 
-  // Même clé que le bloc ValidatedSubmissions : une seule requête, partagée avec le compteur de la tuile.
-  const teamValidated = useQuery({
-    queryKey: ["submissions", "validated"],
-    queryFn: fetchValidatedSubmissions,
-    retry: false,
-  });
-
   const bottomSections = useBottomSections({
     email,
     role: "collaborateur",
     onReadSubmission: onRead,
   });
 
-  const sections: HomeSection[] = TABS.map((t) => {
+  const requestSections: HomeSection[] = TABS.map((t) => {
     const items = mine.data?.filter((s) => s.status === t.status) ?? [];
     return {
       id: t.id,
       label: t.label,
       title: t.title,
       icon: t.icon,
-      count: items.length,
-      ariaLabel: `${t.label}, ${items.length} ${plural(items.length, "demande", "demandes")}`,
       // « Soumettre une demande » et « Exporter le rapport » : dans l'en-tête de la section En attente.
       titleAside: t.id === "en-attente" ? <RequestActions /> : undefined,
       panel: (
@@ -123,23 +113,11 @@ export function MyRequestsSections({
       ),
     };
   });
-  sections.unshift({
-    id: OVERVIEW_ID,
-    label: "Vue d'ensemble",
-    icon: "dashboard",
-    panel: <HomeTopCards onReadNews={onReadNews} />,
-  });
-  const teamCount = teamValidated.data?.length;
-  sections.push({
+  requestSections.push({
     id: "equipe",
     label: "Validées équipe",
     title: "Validées de l'équipe",
     icon: "groups",
-    count: teamCount ?? "–",
-    ariaLabel:
-      teamCount === undefined
-        ? "Validées de l'équipe"
-        : `Validées de l'équipe, ${teamCount} ${plural(teamCount, "demande", "demandes")}`,
     panel: (
       <ValidatedSubmissions
         embedded
@@ -150,6 +128,17 @@ export function MyRequestsSections({
       />
     ),
   });
+
+  const sections: HomeSection[] = [
+    {
+      id: OVERVIEW_ID,
+      label: "Vue d'ensemble",
+      icon: "dashboard",
+      panel: <HomeTopCards onReadNews={onReadNews} />,
+    },
+    // Groupe sans panneau ni compteur : les quatre sous-entrées sont les anciennes sections.
+    { id: "groupe-demandes", label: "Demandes", icon: "inbox", children: requestSections },
+  ];
 
   return <HomeSections sections={sections} bottomSections={bottomSections} />;
 }

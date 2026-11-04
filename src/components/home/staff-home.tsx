@@ -6,7 +6,6 @@ import {
   fetchMetrics,
   fetchMyDepartureNotices,
   fetchNews,
-  fetchSubmissions,
   isUrgentNotice,
 } from "@/lib/dashboard";
 import { BlockersSection } from "./blockers-section";
@@ -14,7 +13,7 @@ import { MetricsSection } from "./metrics-section";
 import { MySubmissions } from "./my-submissions";
 import { useNewsDialog } from "./news-draft-dialog";
 import { NewsSection } from "./news-section";
-import { NewCountPill, PendingSubmissions } from "./pending-submissions";
+import { PendingSubmissions } from "./pending-submissions";
 import { OVERVIEW_ID, plural } from "@/lib/side-nav";
 import { HomeSections, type HomeSection } from "./home-sections";
 import { RequestActions } from "./request-actions";
@@ -33,11 +32,6 @@ export type ManagementTab = {
 
 /** Compteurs des tuiles, calculés sur les données réelles (mêmes clés de requête que les panneaux). */
 function useStaffCounts(email: string) {
-  const submissions = useQuery({
-    queryKey: ["submissions"],
-    queryFn: fetchSubmissions,
-    retry: false,
-  });
   const news = useQuery({ queryKey: ["news"], queryFn: fetchNews, retry: false });
   const blockers = useQuery({ queryKey: ["blockers"], queryFn: fetchBlockers, retry: false });
   const metrics = useQuery({ queryKey: ["metrics"], queryFn: fetchMetrics, retry: false });
@@ -48,7 +42,6 @@ function useStaffCounts(email: string) {
   });
   const n = (len: number | undefined) => (len === undefined ? "—" : len);
   return {
-    pending: n(submissions.data?.length),
     drafts: n(news.data && news.data.filter((x) => x.status === "brouillon").length),
     blockers: n(blockers.data?.length),
     metrics: n(metrics.data?.length),
@@ -62,7 +55,7 @@ function named(name: string, n: number | string, legend: string): string {
   return typeof n === "number" ? `${name}, ${n} ${legend}` : name;
 }
 
-/** Accueil manager/admin : menu latéral (Vue d'ensemble puis cinq sections), seul le panneau actif est visible. */
+/** Accueil manager/admin : menu latéral (Vue d'ensemble, groupe Demandes de trois entrées, puis quatre sections), seul le panneau actif est visible. */
 export function StaffHome({
   isAdmin,
   management,
@@ -84,37 +77,56 @@ export function StaffHome({
       panel: <HomeTopCards onReadNews={p.onReadNews} />,
     },
     {
-      id: "demandes",
+      // Groupe sans panneau ni compteur. « À traiter » garde l'identifiant « demandes » : l'entrée ouverte
+      // par défaut (passée par la page) reste la même.
+      id: "groupe-demandes",
       label: "Demandes",
       icon: "inbox",
-      count: counts.pending,
-      ariaLabel: named("Demandes", counts.pending, "à traiter"),
-      titleAside: (
-        <div className="flex flex-wrap items-center gap-sm">
-          <NewCountPill count={typeof counts.pending === "number" ? counts.pending : 0} />
-          <RequestActions />
-        </div>
-      ),
-      panel: (
-        <div className="space-y-md">
-          <PendingSubmissions
-            embedded
-            canReview
-            role={p.role}
-            email={p.email}
-            onRead={p.onReadSubmission}
-            onReject={p.onReject}
-            onApprove={p.onApprove}
-          />
-          <ValidatedSubmissions
-            role={p.role}
-            email={p.email}
-            managerTeams={p.managerTeams}
-            onRead={p.onReadSubmission}
-          />
-          <MySubmissions email={p.email} onRead={p.onReadSubmission} />
-        </div>
-      ),
+      children: [
+        {
+          id: "demandes",
+          label: "À traiter",
+          title: "Soumissions en attente",
+          icon: "pending_actions",
+          titleAside: <RequestActions />,
+          panel: (
+            <PendingSubmissions
+              embedded
+              canReview
+              role={p.role}
+              email={p.email}
+              onRead={p.onReadSubmission}
+              onReject={p.onReject}
+              onApprove={p.onApprove}
+            />
+          ),
+        },
+        {
+          id: "demandes-validees",
+          label: "Validées",
+          title: "Demandes validées",
+          // La carte (avec son filtre par équipe) porte déjà ce titre.
+          hideTitle: true,
+          icon: "task_alt",
+          titleAside: <RequestActions />,
+          panel: (
+            <ValidatedSubmissions
+              role={p.role}
+              email={p.email}
+              managerTeams={p.managerTeams}
+              onRead={p.onReadSubmission}
+            />
+          ),
+        },
+        {
+          id: "mes-demandes",
+          label: "Mes demandes",
+          title: "Mes soumissions",
+          icon: "person",
+          titleAside: <RequestActions />,
+          panel: <MySubmissions embedded email={p.email} onRead={p.onReadSubmission} />,
+        },
+      ],
     },
     {
       id: "actualites",
