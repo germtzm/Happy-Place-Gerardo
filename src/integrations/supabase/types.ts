@@ -108,6 +108,36 @@ export type Database = {
         }
         Relationships: []
       }
+      blocker_teams: {
+        Row: {
+          blocker_id: string
+          team: string
+        }
+        Insert: {
+          blocker_id: string
+          team: string
+        }
+        Update: {
+          blocker_id?: string
+          team?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blocker_teams_blocker_id_fkey"
+            columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "blockers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blocker_teams_team_fkey"
+            columns: ["team"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["name"]
+          },
+        ]
+      }
       blockers: {
         Row: {
           created_at: string
@@ -212,6 +242,36 @@ export type Database = {
           },
           {
             foreignKeyName: "manager_teams_team_fkey"
+            columns: ["team"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["name"]
+          },
+        ]
+      }
+      metric_teams: {
+        Row: {
+          metric_key: string
+          team: string
+        }
+        Insert: {
+          metric_key: string
+          team: string
+        }
+        Update: {
+          metric_key?: string
+          team?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metric_teams_metric_key_fkey"
+            columns: ["metric_key"]
+            isOneToOne: false
+            referencedRelation: "metrics"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "metric_teams_team_fkey"
             columns: ["team"]
             isOneToOne: false
             referencedRelation: "teams"
