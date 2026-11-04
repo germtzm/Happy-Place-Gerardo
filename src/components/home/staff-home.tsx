@@ -8,6 +8,10 @@ import {
   fetchNews,
   isUrgentNotice,
 } from "@/lib/dashboard";
+import { BlockersAdminPanel } from "@/components/manage/blockers-admin";
+import { MetricsAdminPanel } from "@/components/manage/metrics-admin";
+import { NewsAdminPanel } from "@/components/manage/news-admin";
+import { useAttachmentQueueCleanup } from "@/components/manage/use-attachment-cleanup";
 import { BlockersSection } from "./blockers-section";
 import { MetricsSection } from "./metrics-section";
 import { MySubmissions } from "./my-submissions";
@@ -64,6 +68,8 @@ export function StaffHome({
   ...p
 }: HomeProps & { isAdmin: boolean; management: ManagementTab }) {
   const counts = useStaffCounts(p.email);
+  // Les panneaux d'administration remplacent ceux du manager : même file d'effacement que /manage.
+  useAttachmentQueueCleanup(isAdmin);
   const newsDialog = useNewsDialog();
   const bottomSections = useBottomSections({
     email: p.email,
@@ -135,7 +141,8 @@ export function StaffHome({
       label: "Actualités",
       title: "Actualités du cabinet",
       hideTitle: true,
-      titleAside: (
+      // Admin : le panneau d'administration a déjà son bouton « + NOUVELLE ACTUALITÉ ».
+      titleAside: isAdmin ? undefined : (
         <button
           type="button"
           aria-haspopup="dialog"
@@ -152,7 +159,9 @@ export function StaffHome({
         counts.drafts,
         typeof counts.drafts === "number" ? plural(counts.drafts, "brouillon", "brouillons") : "",
       ),
-      panel: (
+      panel: isAdmin ? (
+        <NewsAdminPanel />
+      ) : (
         <NewsSection
           isAdmin={isAdmin}
           canWriteNews
@@ -174,7 +183,11 @@ export function StaffHome({
         counts.blockers,
         typeof counts.blockers === "number" ? plural(counts.blockers, "ouvert", "ouverts") : "",
       ),
-      panel: <BlockersSection isAdmin={isAdmin} onOpenArchive={p.onOpenArchive} />,
+      panel: isAdmin ? (
+        <BlockersAdminPanel onOpenArchive={p.onOpenArchive} teamFilter />
+      ) : (
+        <BlockersSection isAdmin={isAdmin} onOpenArchive={p.onOpenArchive} />
+      ),
     },
     {
       id: "indicateurs",
@@ -183,7 +196,7 @@ export function StaffHome({
       hideTitle: true,
       icon: "monitoring",
       ariaLabel: "Indicateurs clés",
-      panel: <MetricsSection isAdmin={isAdmin} />,
+      panel: isAdmin ? <MetricsAdminPanel teamFilter /> : <MetricsSection isAdmin={isAdmin} />,
     },
     {
       id: "gestion",

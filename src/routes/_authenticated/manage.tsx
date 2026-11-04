@@ -1,9 +1,6 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { BrandHeader } from "@/components/brand-header";
-import { processAttachmentDeletionQueue } from "@/lib/dashboard";
+import { useAttachmentQueueCleanup } from "@/components/manage/use-attachment-cleanup";
 
 export const Route = createFileRoute("/_authenticated/manage")({
   head: () => ({
@@ -38,17 +35,8 @@ const tabs = [
 ] as const;
 
 function ManageLayout() {
-  const qc = useQueryClient();
   // Suppression silencieuse des pièces jointes échues, une fois par chargement de /manage
-  useEffect(() => {
-    processAttachmentDeletionQueue()
-      .then((r) => {
-        if (r.remaining > 0) toast.error(`${r.remaining} document(s) n'ont pas pu être supprimés.`);
-        else if (r.deleted > 0) toast.success(`${r.deleted} document(s) supprimé(s)`);
-      })
-      .catch(() => toast.error("La suppression des documents échus a échoué."))
-      .finally(() => qc.invalidateQueries({ queryKey: ["attachment_deletion_queue"] }));
-  }, [qc]);
+  useAttachmentQueueCleanup();
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen">
       <BrandHeader />

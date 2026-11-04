@@ -1,0 +1,240 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { toast } from "sonner";
+import {
+  ConfirmDelete,
+  ErrorSummary,
+  Field,
+  FormActions,
+  Modal,
+  RowActions,
+  TextInput,
+} from "@/components/manage/crud-ui";
+import { metricSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
+import { MetricHistory } from "@/components/manage/metric-history";
+import { TeamCheckboxes } from "@/components/manage/team-checkboxes";
+import { TeamFilter } from "@/components/home/team-filter";
+import { useTeamFilter } from "@/components/home/use-team-filter";
+import { filterByTeam } from "@/lib/home-lists";
+import {
+  createMetric,
+  deleteMetric,
+  fetchMetrics,
+  fetchSelectableTeams,
+  TeamLinkError,
+  deltaText,
+  formatMetricValue,
+  updateMetricRow,
+  TREND_LABELS,
+  type Metric,
+  type MetricInput,
+} from "@/lib/dashboard";
+
+type FormState = { key: string; label: string; value: string; unit: string };
+
+const empty: FormState = { key: "", label: "", value: "", unit: "" };
+
+/**
+ * Corps de la page /manage/metrics, aussi affiché dans l'accueil de l'admin. `teamFilter` ajoute le
+ * sélecteur d'équipe de l'accueil au-dessus de la liste (absent de la page /manage).
+ */
+export function MetricsAdminPanel({ teamFilter = false }: { teamFilter?: boolean }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState<FormState | null>(null);
+  const [editing, setEditing] = useState<Metric | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [toDelete, setToDelete] = useState<Metric | null>(null);
+  const [formTeams, setFormTeams] = useState<string[]>([]);
+  const [team] = useTeamFilter();
+
+  const list = useQuery({ queryKey: ["metrics"], queryFn: fetchMetrics, retry: false });
+  const shown = teamFilter && list.data ? filterByTeam(list.data, team) : list.data;
+  const teamsQuery = useQuery({
+    queryKey: ["teams", "selectable"],
+    queryFn: fetchSelectableTeams,
+    retry: false,
+  });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["metrics"] });
+  const onError = (e: unknown) => toast.error((e as Error).message);
+
+  const save = useMutation({
+    mutationFn: (v: { input: MetricInput; teams: string[] }) =>
+      editing ? updateMetricRow(editing.key, v.input, v.teams) : createMetric(v.input, v.teams),
+    onSuccess: async () => {
+      toast.success(editing ? "Indicateur modifié" : "Indicateur créé");
+      close();
+      await invalidate();
+    },
+    onError: (e: unknown) => {
+      onError(e);
+      // L'indicateur est enregistré mais pas ses équipes : on recharge la liste, et à la création on ferme
+      // la fenêtre pour éviter un doublon (il se rouvre depuis la liste pour corriger les équipes).
+      if (e instanceof TeamLinkError) {
+        invalidate();
+        if (!editing) close();
+      }
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: (key: string) => deleteMetric(key),
+    onSuccess: () => {
+      toast.success("Indicateur supprimé");
+      setToDelete(null);
+      invalidate();
+    },
+    onError,
+  });
+
+  function close() {
+    setForm(null);
+    setEditing(null);
+    setErrors({});
+    setFormTeams([]);
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form) return;
+    const raw = form.value.trim().replace(",", ".");
+    const candidate = {
+      key: form.key,
+      label: form.label,
+      value: raw === "" || Number.isNaN(Number(raw)) ? Number.NaN : Number(raw),
+      unit: form.unit.trim() === "" ? null : form.unit,
+    };
+    const res = validate(metricSchema, candidate);
+    if (!res.ok) {
+      setErrors(res.errors);
+      return;
+    }
+    setErrors({});
+    save.mutate({ input: res.data, teams: formTeams });
+  }
+
+  return (
+    <section className="space-y-md">
+      <div className="flex items-center justify-between">
+        <h2 className="font-headline-sm text-headline-sm text-primary">
+          Indicateurs ({list.data?.length ?? 0})
+        </h2>
+        <button
+          onClick={() => {
+            setEditing(null);
+            setErrors({});
+            setFormTeams([]);
+            setForm({ ...empty });
+          }}
+          className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md"
+        >
+          + NOUVEL INDICATEUR
+        </button>
+      </div>
+
+      {teamFilter && <TeamFilter />}
+
+      {list.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
+      {list.isError && (
+        <p className="text-body-sm text-error">Impossible de charger les indicateurs.</p>
+      )}
+
+      <div className="space-y-xs">
+        {shown?.map((m) => (
+          <article
+            key={m.key}
+            className="flex items-start justify-between gap-sm p-sm bg-card border border-outline-variant"
+          >
+            <div className="min-w-0 [overflow-wrap:anywhere]">
+              <p className="font-body-md text-primary font-bold">
+                {m.label} — {formatMetricValue(m.value, m.unit)}
+              </p>
+              <p className="text-[11px] font-label-sm text-on-surface-variant mt-xs">
+                {m.key} • {TREND_LABELS[m.trend]}
+                {m.previous_value != null && (
+                  <>
+                    {deltaText(m) && ` · ${deltaText(m)}`}
+                    {` · avant : ${formatMetricValue(m.previous_value, m.unit).replace(/%$/, " %")}`}
+                  </>
+                )}
+              </p>
+              <MetricHistory metricKey={m.key} unit={m.unit} />
+            </div>
+            <RowActions
+              onEdit={() => {
+                setEditing(m);
+                setErrors({});
+                setFormTeams(m.teams);
+                setForm({
+                  key: m.key,
+                  label: m.label,
+                  value: String(m.value),
+                  unit: m.unit ?? "",
+                });
+              }}
+              onDelete={() => setToDelete(m)}
+            />
+          </article>
+        ))}
+        {shown?.length === 0 && (
+          <p className="text-body-sm italic text-on-surface-variant">Aucun indicateur.</p>
+        )}
+      </div>
+
+      {form && (
+        <Modal title={editing ? "Modifier l'indicateur" : "Nouvel indicateur"} onClose={close}>
+          <form onSubmit={submit} className="space-y-sm" noValidate>
+            <ErrorSummary errors={errors} />
+            <Field label="Clé technique" error={errors.key}>
+              <TextInput
+                value={form.key}
+                disabled={!!editing}
+                maxLength={40}
+                placeholder="ex : taux_placement"
+                onChange={(e) => setForm({ ...form, key: e.target.value })}
+              />
+            </Field>
+            <Field label="Libellé" error={errors.label}>
+              <TextInput
+                value={form.label}
+                maxLength={60}
+                onChange={(e) => setForm({ ...form, label: e.target.value })}
+              />
+            </Field>
+            <Field label="Valeur" error={errors.value}>
+              <TextInput
+                value={form.value}
+                inputMode="decimal"
+                onChange={(e) => setForm({ ...form, value: e.target.value })}
+              />
+            </Field>
+            <Field label="Unité (optionnel)" error={errors.unit}>
+              <TextInput
+                value={form.unit}
+                maxLength={8}
+                placeholder="%"
+                onChange={(e) => setForm({ ...form, unit: e.target.value })}
+              />
+            </Field>
+            <TeamCheckboxes
+              teams={teamsQuery.data}
+              value={formTeams}
+              onChange={setFormTeams}
+              loading={teamsQuery.isLoading}
+              failed={teamsQuery.isError}
+            />
+            <FormActions pending={save.isPending} onCancel={close} />
+          </form>
+        </Modal>
+      )}
+
+      {toDelete && (
+        <ConfirmDelete
+          label={toDelete.label}
+          pending={remove.isPending}
+          onCancel={() => setToDelete(null)}
+          onConfirm={() => remove.mutate(toDelete.key)}
+        />
+      )}
+    </section>
+  );
+}
