@@ -147,7 +147,7 @@ export function BlockersAdminPanel({
               type="button"
               aria-haspopup="dialog"
               onClick={() => onOpenArchive()}
-              className="text-primary font-label-sm text-label-sm underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="flex min-h-[44px] items-center border border-outline bg-surface px-md py-xs font-label-md text-label-md text-primary hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               VOIR L'ARCHIVE
             </button>
@@ -159,7 +159,7 @@ export function BlockersAdminPanel({
               setFormTeams([]);
               setForm({ ...empty });
             }}
-            className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md"
+            className="flex min-h-[44px] items-center justify-center border border-transparent px-md py-xs bg-primary text-on-primary font-label-md text-label-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             + NOUVEAU POINT BLOQUANT
           </button>

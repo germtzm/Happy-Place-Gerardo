@@ -21,23 +21,28 @@ function AccountPill({ firstName, roleLabel }: Pick<HomeBanner, "firstName" | "r
     <span
       role="img"
       aria-label={label}
-      title={label}
-      className="flex min-h-[44px] min-w-0 items-center gap-xs px-xs"
+      className="relative flex min-h-[44px] min-w-0 items-center gap-xs px-xs"
     >
+      {/* Le rond : le survol de lui-même ou de la pastille élargie (son descendant) déclenche l'élargissement. */}
       <span
         aria-hidden="true"
-        className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#28282D] font-label-md text-label-md text-[#F9F8F5]"
+        className="group/circle peer/circle flex size-8 shrink-0 items-center justify-center rounded-full bg-[#28282D] font-label-md text-label-md text-[#F9F8F5]"
       >
         {firstInitial(name)}
+        {name && (
+          // Position absolue par rapport à la pilule : rien ne bouge dans le bandeau. Largeur limitée à 10 rem
+          // et à celle de la pilule, pour ne jamais sortir de la fenêtre.
+          <span className="absolute left-xs top-1/2 flex h-8 w-max max-w-8 -translate-y-1/2 items-center overflow-hidden rounded-full bg-[#28282D] px-sm font-label-md text-label-md text-[#F9F8F5] opacity-0 transition-[max-width,opacity] duration-150 group-hover/circle:max-w-[min(10rem,100%)] group-hover/circle:opacity-100 motion-reduce:transition-none">
+            <span className="truncate">{name}</span>
+          </span>
+        )}
       </span>
-      {name && (
-        <span
-          aria-hidden="true"
-          className="max-w-[6rem] truncate font-label-md text-label-md text-primary sm:max-w-[10rem]"
-        >
-          {name}
-        </span>
-      )}
+      <span
+        aria-hidden="true"
+        className="max-w-[6rem] truncate font-label-md text-label-md text-primary peer-hover/circle:invisible sm:max-w-[10rem]"
+      >
+        {roleLabel}
+      </span>
     </span>
   );
 }
