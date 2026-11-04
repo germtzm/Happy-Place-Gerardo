@@ -220,11 +220,15 @@ function Band({
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-x-sm rounded-[8px] bg-[#F5F4F1] px-sm">
-          <h2 id={headingId} className="font-display text-[24px] leading-tight text-[#28282D]">
+        <div className="flex flex-nowrap items-center justify-between gap-x-sm rounded-[8px] bg-[#F5F4F1] px-sm">
+          <h2
+            id={headingId}
+            title={title}
+            className="line-clamp-1 min-w-0 font-display text-[24px] leading-tight text-[#28282D]"
+          >
             {title}
           </h2>
-          <div className="flex flex-wrap items-center gap-xs">
+          <div className="flex shrink-0 flex-nowrap items-center gap-xs">
             {link}
             {controls}
           </div>
@@ -532,7 +536,7 @@ export function NewsBand({
                   aria-label={`Page ${i + 1} sur ${pages.length}`}
                   aria-current={i === current ? "true" : undefined}
                   onClick={() => setPage(i)}
-                  className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] ${ringCls}`}
+                  className={`flex min-h-[44px] min-w-[28px] items-center justify-center rounded-[8px] ${ringCls}`}
                 >
                   <span
                     aria-hidden="true"
