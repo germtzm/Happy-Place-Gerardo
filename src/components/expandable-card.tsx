@@ -87,13 +87,16 @@ export function SubmissionPreview({
           type="button"
           aria-haspopup="dialog"
           onClick={onOpen}
-          className="font-label-sm text-label-sm text-primary font-bold underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="inline-flex min-h-[24px] items-center font-label-sm text-label-sm text-primary font-bold underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           Voir plus
         </button>
       )}
       {!overflows && reserveMore && (
-        <span aria-hidden="true" className="invisible block font-label-sm text-label-sm">
+        <span
+          aria-hidden="true"
+          className="invisible inline-flex min-h-[24px] items-center font-label-sm text-label-sm"
+        >
           Voir plus
         </span>
       )}

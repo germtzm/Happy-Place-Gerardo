@@ -18,12 +18,17 @@ const MOBILE_QUERY = "(max-width: 767.98px)";
 const HEIGHT_CLS =
   "h-[calc(100dvh-var(--home-header-h,4rem)-3.75rem-45px)] lg:h-[calc(100dvh-var(--home-header-h,4rem)-3.75rem)]";
 
-/** Fond décoratif : dégradés rose (haut droite) et beige (bas gauche) sur #F5F4F1, et quelques vagues. */
+/**
+ * Fond décoratif : dégradés rose (haut droite) et beige (bas gauche) sur #F5F4F1, et quelques vagues.
+ * Calque fixe sur toute la zone de contenu, bords compris : à partir de lg à droite du rail (232 px),
+ * dessous le bandeau ; sous lg, dessous le bandeau et la barre « Menu » (45 px). Il disparaît avec la
+ * Vue d'ensemble (parent en display: none) et reste sous le contenu (z-index négatif, racine `isolate`).
+ */
 function OverviewBackground() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-[#F5F4F1]"
+      className="pointer-events-none fixed bottom-0 left-0 right-0 top-[calc(var(--home-header-h,4rem)+45px)] -z-10 overflow-hidden bg-[#F5F4F1] lg:left-[232px] lg:top-[var(--home-header-h,4rem)]"
       style={{
         backgroundImage:
           "radial-gradient(70% 60% at 100% 0%, #FED2CE 0%, rgba(254,210,206,0) 70%), radial-gradient(70% 60% at 0% 100%, #F0D0BC 0%, rgba(240,208,188,0) 70%)",

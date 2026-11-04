@@ -17,7 +17,7 @@ export function SubmissionHistory({ submissionId }: { submissionId: string }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="text-[11px] font-label-sm uppercase text-on-surface-variant underline"
+        className="inline-flex min-h-[24px] items-center rounded-[4px] text-[11px] font-label-sm uppercase text-on-surface-variant underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         {open ? "▾" : "▸"} Historique
       </button>
