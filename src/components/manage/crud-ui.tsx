@@ -64,6 +64,8 @@ export function Modal({
 }) {
   const content = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
+  // Élément qui avait le focus à l'ouverture : Radix n'a pas de Trigger ici, il ne sait pas où le rendre.
+  const origin = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null);
   return (
     <DialogPrimitive.Root open onOpenChange={(o) => !o && onClose()}>
       <DialogPrimitive.Portal>
@@ -76,6 +78,12 @@ export function Modal({
             e.preventDefault();
             const first = content.current?.querySelector<HTMLElement>(FIRST_FIELD);
             (first ?? closeButton.current)?.focus();
+          }}
+          onCloseAutoFocus={(e) => {
+            // Le focus revient sur l'élément d'origine s'il existe encore, sinon il reste où il est.
+            e.preventDefault();
+            const el = origin.current;
+            if (el && el.isConnected) el.focus();
           }}
           className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-4rem)] w-[calc(100vw-24px)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col border border-outline bg-surface-container-lowest focus:outline-none"
         >
