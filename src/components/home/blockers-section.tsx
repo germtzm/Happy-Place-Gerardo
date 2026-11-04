@@ -19,8 +19,8 @@ export function BlockersSection({ isAdmin, onOpenArchive }: { isAdmin: boolean; 
 
   return (
     <section className="col-span-12 md:col-span-7 rounded-[8px] bg-surface-container-lowest border border-outline-variant p-md">
-      <div className="flex items-center justify-between mb-md">
-        <div className="flex items-center gap-sm">
+      <div className="flex flex-wrap items-center justify-between gap-sm mb-md">
+        <div className="flex flex-wrap items-center gap-sm">
           <h2 className="font-headline-sm text-headline-sm text-primary">Points Bloquants</h2>
           <span className="text-xs bg-error-container text-on-error-container px-xs py-1 font-label-sm">
             PRIORITÉ HAUTE
@@ -30,9 +30,9 @@ export function BlockersSection({ isAdmin, onOpenArchive }: { isAdmin: boolean; 
           type="button"
           aria-haspopup="dialog"
           onClick={() => onOpenArchive()}
-          className="text-primary font-label-sm text-label-sm underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="flex min-h-[44px] items-center border border-outline bg-surface px-md py-xs font-label-md text-label-md text-primary hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
-           VOIR L'ARCHIVE
+          VOIR L'ARCHIVE
         </button>
       </div>
       <TeamFilter className="mb-md" />
