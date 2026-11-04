@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { NewsImage, NewsLinks } from "@/components/news-media";
-import { deleteDraftNews, fetchNews, publishDraftNews, timeAgo, type News } from "@/lib/dashboard";
+import { deleteDraftNews, fetchNews, timeAgo, type News } from "@/lib/dashboard";
 import { CardActionButton } from "./card-action-button";
 import { Icon } from "./icon";
 import { NewsFormDialog, type NewsDialogControl } from "./news-draft-dialog";
@@ -25,15 +25,6 @@ export function NewsSection({
   const qc = useQueryClient();
   const news = useQuery({ queryKey: ["news"], queryFn: fetchNews, retry: false });
   const onError = (e: unknown) => toast.error((e as Error).message);
-
-  const publishDraft = useMutation({
-    mutationFn: publishDraftNews,
-    onSuccess: () => {
-      toast.success("Actualité publiée");
-      qc.invalidateQueries({ queryKey: ["news"] });
-    },
-    onError,
-  });
 
   const removeDraft = useMutation({
     mutationFn: (n: { id: string; image_path?: string | null }) => deleteDraftNews(n.id, n.image_path),
@@ -115,16 +106,6 @@ export function NewsSection({
                           }}
                         >
                           Supprimer
-                        </CardActionButton>
-                        <CardActionButton
-                          variant="white"
-                          disabled={publishDraft.isPending}
-                          onClick={() => {
-                            if (window.confirm(`Publier l'actualité « ${n.title} » ? Elle sera visible par tous.`))
-                              publishDraft.mutate(n.id);
-                          }}
-                        >
-                          Publier
                         </CardActionButton>
                       </div>
                     )}
