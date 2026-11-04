@@ -65,8 +65,14 @@ function named(name: string, n: number | string, legend: string): string {
 export function StaffHome({
   isAdmin,
   management,
+  extraSections = [],
   ...p
-}: HomeProps & { isAdmin: boolean; management: ManagementTab }) {
+}: HomeProps & {
+  isAdmin: boolean;
+  management: ManagementTab;
+  /** Entrées ou groupes insérés juste avant l'entrée de gestion (par exemple le groupe Utilisateurs de l'admin). */
+  extraSections?: HomeSection[];
+}) {
   const counts = useStaffCounts(p.email);
   // Les panneaux d'administration remplacent ceux du manager : même file d'effacement que /manage.
   useAttachmentQueueCleanup(isAdmin);
@@ -198,6 +204,7 @@ export function StaffHome({
       ariaLabel: "Indicateurs clés",
       panel: isAdmin ? <MetricsAdminPanel teamFilter /> : <MetricsSection isAdmin={isAdmin} />,
     },
+    ...extraSections,
     {
       id: "gestion",
       label: management.shortLabel,
