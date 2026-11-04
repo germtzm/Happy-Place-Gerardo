@@ -1,67 +1,63 @@
 import { useQuery } from "@tanstack/react-query";
-import { useContext, type ReactNode } from "react";
-import {
-  deltaText,
-  fetchBlockers,
-  fetchMetrics,
-  fetchNews,
-  timeAgo,
-  type News,
-} from "@/lib/dashboard";
-import { filterByTeam } from "@/lib/home-lists";
-import { FullViewContext, type FullView } from "./full-view-context";
-import { Icon } from "./icon";
-import { formatMetric, metricLabel, trendText } from "./metrics-format";
+import { useMediaQuery } from "@/hooks/use-auto-advance";
+import { fetchBlockers, fetchMetrics, fetchNews, type News } from "@/lib/dashboard";
+import { filterByTeam, publishedNewsLatestFirst } from "@/lib/home-lists";
+import { BlockersBand, MetricsBand, NewsBand } from "./overview-bands";
 import { TeamFilter } from "./team-filter";
 import { canPickTeam, useTeamFilter, useTeamScope } from "./use-team-filter";
 
-const BLOCKERS_SHOWN = 3;
-const METRICS_SHOWN = 3;
+/** Sous 768 px (moins de md) : disposition mobile. */
+const MOBILE_QUERY = "(max-width: 767.98px)";
 
-const cardCls =
-  "min-w-0 flex flex-col rounded-[8px] border border-[#CDCDD1] bg-surface-container-lowest p-md shadow-none";
-const titleCls =
-  "font-headline-sm text-headline-sm text-primary border-b border-[#CDCDD1] pb-xs mb-sm";
+/**
+ * Hauteur de la vue : la fenêtre, moins le bandeau, moins le padding vertical de la section (2 x 1.25rem).
+ * Sous lg, la barre « Menu » (44 px + 1 px de bordure) occupe aussi une ligne au-dessus de la section.
+ */
+const HEIGHT_CLS =
+  "h-[calc(100dvh-var(--home-header-h,4rem)-2.5rem-45px)] lg:h-[calc(100dvh-var(--home-header-h,4rem)-2.5rem)]";
 
-function SeeAll({ label, view }: { label: string; view: FullView }) {
-  const openFullView = useContext(FullViewContext);
+/** Fond décoratif : dégradés rose (haut droite) et beige (bas gauche) sur #F5F4F1, et quelques vagues. */
+function OverviewBackground() {
   return (
-    <button
-      type="button"
-      id={`see-all-${view}`}
-      onClick={() => openFullView(view)}
-      className="mt-auto inline-flex min-h-[44px] items-center self-start pt-sm font-label-sm text-label-sm uppercase text-primary underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-[#F5F4F1]"
+      style={{
+        backgroundImage:
+          "radial-gradient(70% 60% at 100% 0%, #FED2CE 0%, rgba(254,210,206,0) 70%), radial-gradient(70% 60% at 0% 100%, #F0D0BC 0%, rgba(240,208,188,0) 70%)",
+      }}
     >
-      {label} →
-    </button>
+      <svg
+        className="absolute inset-0 h-full w-full"
+        viewBox="0 0 1200 800"
+        preserveAspectRatio="none"
+        fill="none"
+        stroke="#28282D"
+        strokeWidth="1.5"
+        strokeOpacity="0.07"
+      >
+        <path d="M0 140 C 200 80, 400 200, 600 140 S 1000 80, 1200 150" />
+        <path d="M0 190 C 200 130, 400 250, 600 190 S 1000 130, 1200 200" />
+        <path d="M0 640 C 220 700, 420 580, 640 640 S 1000 700, 1200 630" />
+        <path d="M0 690 C 220 750, 420 630, 640 690 S 1000 750, 1200 680" />
+        <path d="M0 740 C 220 800, 420 680, 640 740 S 1000 800, 1200 730" />
+      </svg>
+    </div>
   );
 }
 
-function Card({
-  title,
-  children,
-  seeAll,
-  view,
-  className = "",
-}: {
-  title: string;
-  children: ReactNode;
-  seeAll: string;
-  view: FullView;
-  className?: string;
-}) {
-  return (
-    <section className={`${cardCls} ${className}`}>
-      <h2 className={titleCls}>{title}</h2>
-      <div className="space-y-xs">{children}</div>
-      <SeeAll label={seeAll} view={view} />
-    </section>
-  );
+/** Date du jour en capitales, par exemple « MERCREDI 4 NOVEMBRE ». */
+function todayLabel(): string {
+  return new Date()
+    .toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+    .toUpperCase();
 }
 
 /**
- * Moitié haute de l'accueil (lecture seule). Le sélecteur d'équipe, au-dessus des points bloquants et des
- * indicateurs, choisit parmi ce que la base renvoie ; les actualités ne sont pas filtrées.
+ * Vue d'ensemble (lecture seule), tenant dans la hauteur de l'écran : indicateurs, actualités, points
+ * bloquants. Le sélecteur d'équipe, dans la rangée de titre, filtre les indicateurs et les points
+ * bloquants ; les actualités ne sont pas filtrées. Le `h1` de la page est celui de SideNavLayout
+ * (masqué), le titre affiché ici n'est qu'une présentation.
  */
 export function HomeTopCards({ onReadNews }: { onReadNews: (n: News) => void }) {
   const news = useQuery({ queryKey: ["news"], queryFn: fetchNews, retry: false });
@@ -70,114 +66,58 @@ export function HomeTopCards({ onReadNews }: { onReadNews: (n: News) => void }) 
   const [team] = useTeamFilter();
   const scope = useTeamScope();
   const showFilter = canPickTeam(scope.data);
-  const latest = news.data?.filter((n) => n.status === "publiée").slice(0, 2) ?? [];
-  const shownBlockers = filterByTeam(blockers.data ?? [], team).slice(0, BLOCKERS_SHOWN);
-  const shownMetrics = filterByTeam(metrics.data ?? [], team).slice(0, METRICS_SHOWN);
+  const compact = useMediaQuery(MOBILE_QUERY);
+
+  const published = publishedNewsLatestFirst(news.data);
+  const shownBlockers = filterByTeam(blockers.data ?? [], team);
+  const shownMetrics = filterByTeam(metrics.data ?? [], team);
 
   return (
-    <div className="grid grid-cols-1 gap-md md:grid-cols-[3fr_2fr_2fr]">
-      <Card
-        title="Actualités du cabinet"
-        seeAll="VOIR TOUTES LES ACTUALITÉS"
-        view="news"
-        className={showFilter ? "md:col-start-1 md:row-span-2 md:row-start-1" : ""}
-      >
-        {news.isError && (
-          <p className="text-body-sm text-error">Les actualités sont indisponibles.</p>
-        )}
-        {news.data && latest.length === 0 && (
-          <p className="text-body-sm text-on-surface-variant italic">Aucune actualité publiée.</p>
-        )}
-        {latest.map((n) => (
-          <button
-            type="button"
-            key={n.id}
-            onClick={() => onReadNews(n)}
-            aria-haspopup="dialog"
-            className="w-full min-w-0 space-y-[2px] rounded-[8px] bg-surface-container p-xs text-left transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    <div
+      className={`relative isolate flex min-w-0 flex-col gap-sm overflow-hidden p-sm md:p-md ${HEIGHT_CLS}`}
+    >
+      <OverviewBackground />
+
+      <div className="flex flex-wrap items-end justify-between gap-x-sm gap-y-xs">
+        <div className="rounded-[8px] bg-[#F5F4F1] px-sm py-[6px]">
+          <p
+            aria-hidden="true"
+            className="font-display text-[30px] leading-none text-[#28282D] md:text-[38px]"
           >
-            <p className="flex flex-wrap items-center gap-xs font-label-sm text-label-sm uppercase text-on-surface-variant">
-              <span className="rounded-[8px] border border-[#CDCDD1] bg-surface-container-lowest px-xs">
-                {n.author}
-              </span>
-              <span>{timeAgo(n.created_at)}</span>
-            </p>
-            <p
-              title={n.title}
-              className="line-clamp-1 font-body-md text-body-md font-bold text-primary wrap-anywhere"
-            >
-              {n.title}
-            </p>
-            {n.body && (
-              <p className="line-clamp-2 text-body-sm text-on-surface-variant">{n.body}</p>
-            )}
-          </button>
-        ))}
-      </Card>
-
-      {showFilter && <TeamFilter className="md:col-span-2 md:col-start-2 md:row-start-1" />}
-
-      <Card title="Points bloquants" seeAll="VOIR TOUS LES POINTS BLOQUANTS" view="blockers">
-        {blockers.isError && (
-          <p className="text-body-sm text-error">Les points bloquants sont indisponibles.</p>
-        )}
-        {blockers.data && shownBlockers.length === 0 && (
-          <p className="text-body-sm text-on-surface-variant italic">
-            Aucun point bloquant en cours.
+            Vue d'ensemble
           </p>
-        )}
-        {shownBlockers.map((b) => {
-          const critical = b.severity === "critical";
-          return (
-            <div
-              key={b.id}
-              className={`${critical ? "accent-bar " : ""}flex items-start gap-xs rounded-[8px] border border-[#CDCDD1] bg-surface-container-lowest p-xs`}
-            >
-              <Icon
-                name={critical ? "error" : "warning"}
-                className={critical ? "text-error" : "text-secondary"}
-              />
-              <div className="min-w-0">
-                <p
-                  title={b.title}
-                  className="line-clamp-1 font-body-md text-body-md font-bold text-primary wrap-anywhere"
-                >
-                  {b.title}
-                </p>
-                <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-                  {b.status} • {b.department}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-      </Card>
-
-      <Card title="Indicateurs clés" seeAll="VOIR TOUS LES INDICATEURS" view="metrics">
-        {metrics.isError && (
-          <p className="text-body-sm text-error">Les indicateurs sont indisponibles.</p>
-        )}
-        {metrics.data && shownMetrics.length === 0 && (
-          <p className="text-body-sm text-on-surface-variant italic">Aucun indicateur publié.</p>
-        )}
-        {shownMetrics.map((m) => (
-          <div
-            key={m.key}
-            className="flex flex-wrap items-center justify-between gap-x-sm gap-y-xs rounded-[8px] border border-[#CDCDD1] bg-surface-container-lowest p-xs"
-          >
-            <div className="min-w-[7rem] flex-1">
-              <p className="font-label-sm text-label-sm uppercase text-on-surface-variant">
-                {metricLabel(m, m.label)}
-              </p>
-              <p className="font-label-sm text-label-sm text-on-surface-variant">
-                {trendText(m)}
-                {deltaText(m) && ` · ${deltaText(m)}`}
-              </p>
-            </div>
-            <p className="font-display text-[22px] text-primary">{formatMetric(m, "—")}</p>
+          <p className="mt-[4px] font-label-md text-label-md uppercase text-[#55555A]">
+            {todayLabel()}
+          </p>
+        </div>
+        {showFilter && (
+          <div className="rounded-[8px] bg-[#F5F4F1] px-sm py-[4px]">
+            <TeamFilter />
           </div>
-        ))}
-      </Card>
+        )}
+      </div>
+
+      <MetricsBand
+        metrics={shownMetrics}
+        isError={metrics.isError}
+        loaded={!!metrics.data}
+        className="flex-none md:flex-1"
+      />
+      <NewsBand
+        news={published}
+        isError={news.isError}
+        loaded={!!news.data}
+        compact={compact}
+        onReadNews={onReadNews}
+        className="flex-1 md:flex-[2]"
+      />
+      <BlockersBand
+        blockers={shownBlockers}
+        isError={blockers.isError}
+        loaded={!!blockers.data}
+        compact={compact}
+        className="flex-1 md:flex-[2]"
+      />
     </div>
   );
 }

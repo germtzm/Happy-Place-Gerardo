@@ -87,6 +87,8 @@ export function StaffHome({
     {
       id: OVERVIEW_ID,
       label: "Vue d'ensemble",
+      // Le titre visible est dans HomeTopCards ; le h1 reste dans le DOM (cible du focus), en sr-only.
+      hideTitle: true,
       icon: "dashboard",
       panel: <HomeTopCards onReadNews={p.onReadNews} />,
     },
