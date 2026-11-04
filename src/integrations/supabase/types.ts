@@ -213,6 +213,42 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback_responses: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          is_demo: boolean
+          q_accueil: number | null
+          q_demandes: number | null
+          q_notifications: number | null
+          role: Database["public"]["Enums"]["app_role"]
+          satisfaction: number
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          is_demo?: boolean
+          q_accueil?: number | null
+          q_demandes?: number | null
+          q_notifications?: number | null
+          role: Database["public"]["Enums"]["app_role"]
+          satisfaction: number
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          is_demo?: boolean
+          q_accueil?: number | null
+          q_demandes?: number | null
+          q_notifications?: number | null
+          role?: Database["public"]["Enums"]["app_role"]
+          satisfaction?: number
+        }
+        Relationships: []
+      }
       manager_teams: {
         Row: {
           allowed_user_id: string
@@ -566,6 +602,16 @@ export type Database = {
       }
       mark_departure_notice_downloaded: {
         Args: { _id: string }
+        Returns: undefined
+      }
+      submit_feedback: {
+        Args: {
+          p_accueil?: number
+          p_comment?: string
+          p_demandes?: number
+          p_notifications?: number
+          p_satisfaction: number
+        }
         Returns: undefined
       }
     }
