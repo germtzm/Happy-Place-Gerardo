@@ -36,6 +36,11 @@ export type SideNavItem = {
    */
   onSelect?: () => void;
   /**
+   * Mise en avant d'une entrée d'action : `soft` = fond clair avec bordure, `dark` = fond foncé, texte et
+   * icône clairs. Sans effet sur les sections et les groupes.
+   */
+  emphasis?: "soft" | "dark";
+  /**
    * Sous-entrées : l'élément est alors un groupe dépliable. Un groupe n'est jamais la section active,
    * n'a ni `onSelect` ni titre de section ; ses enfants sont des entrées normales (sections ou actions).
    */
@@ -80,7 +85,17 @@ function CountBadge({ item, className = "" }: { item: SideNavItem; className?: s
  * #55555A sur blanc 7,4, sur #F5F4F1 6,7 et sur #EEEDEA 6,3. L'anneau de focus #28282D est un indicateur
  * de 2 px, sans texte.
  */
-function rowCls(active: boolean, bold = false): string {
+function rowCls(active: boolean, bold = false, emphasis?: SideNavItem["emphasis"]): string {
+  if (emphasis) {
+    // Entrées d'action mises en avant : anneau de focus extérieur de 2 px (#28282D sur blanc, 14 pour 1),
+    // séparé du fond de l'entrée par 2 px de blanc, car un anneau intérieur #28282D disparaîtrait sur le
+    // fond foncé. Contrastes : #28282D sur #EEEDEA 12,5 ; #F9F8F5 sur #28282D 14 ; #F9F8F5 sur #3A3A40 11.
+    const look =
+      emphasis === "dark"
+        ? "bg-[#28282D] text-[#F9F8F5] hover:bg-[#3A3A40]"
+        : "border border-[#CDCDD1] bg-[#EEEDEA] text-[#28282D] hover:bg-[#E3E2DE]";
+    return `flex min-h-[44px] w-full items-center gap-[10px] rounded-[8px] px-[10px] py-[6px] text-left font-label-md text-label-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#28282D] focus-visible:ring-offset-2 focus-visible:ring-offset-white ${look}`;
+  }
   const state = active
     ? "bg-[#EEEDEA] font-bold text-[#28282D]"
     : `text-[#55555A] hover:bg-[#F5F4F1] hover:text-[#28282D] ${bold ? "font-bold" : ""}`;
@@ -107,7 +122,7 @@ function NavLeaf({ item, ctx, child = false }: NodeProps) {
         aria-current={active ? "page" : undefined}
         aria-label={item.ariaLabel}
         onClick={() => ctx.onPick(item)}
-        className={rowCls(active)}
+        className={rowCls(active, false, item.onSelect ? item.emphasis : undefined)}
       >
         {item.icon && <Icon name={item.icon} size={child ? 18 : 20} className="shrink-0" />}
         <span className="min-w-0 flex-1 wrap-anywhere">{item.label}</span>

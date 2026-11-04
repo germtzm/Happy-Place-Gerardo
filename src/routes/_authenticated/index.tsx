@@ -292,6 +292,7 @@ function ManagerSpace() {
       label: "Donner mon avis",
       ariaLabel: "Donner mon avis",
       icon: "rate_review",
+      emphasis: "soft",
       onSelect: () => setFeedbackOpen(true),
     },
     {
@@ -299,6 +300,7 @@ function ManagerSpace() {
       label: "Déconnexion",
       ariaLabel: "Se déconnecter",
       icon: "logout",
+      emphasis: "dark",
       onSelect: () => {
         void signOut();
       },

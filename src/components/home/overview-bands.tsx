@@ -593,40 +593,71 @@ function BlockerCard({ b, compact }: { b: Blocker; compact: boolean }) {
       {SEVERITY_LABELS[b.severity] ?? SEVERITY_LABELS.info}
     </span>
   );
+  // Icône de gravité, décorative : la gravité est dite par la pastille.
+  const icon = (
+    <span aria-hidden="true" className="shrink-0">
+      <Icon
+        name={critical ? "error" : "warning"}
+        size={20}
+        className={critical ? "text-error [font-variation-settings:'FILL'_1]" : "text-secondary"}
+      />
+    </span>
+  );
   if (compact) {
-    // Sous md : 54 px, statut sur une ligne, titre sur une ligne (titre complet en infobulle).
+    // Sous md : 54 px, icône, statut sur une ligne, titre sur une ligne (titre complet en infobulle).
     return (
       <div
-        className={`${critical ? "accent-bar " : ""}${cardCls} flex h-[54px] min-w-0 flex-col justify-center gap-[2px] overflow-hidden px-xs`}
+        className={`${critical ? "accent-bar " : ""}${cardCls} flex h-[54px] min-w-0 items-center gap-xs overflow-hidden px-xs`}
       >
-        <p className="flex items-center gap-xs font-label-sm text-label-sm uppercase text-[#55555A]">
-          {pill}
-          <span className="line-clamp-1 min-w-0">
-            {b.status} • {b.department}
-          </span>
-        </p>
-        <p
-          title={b.title}
-          className="line-clamp-1 font-body-md text-[16px] font-bold leading-tight text-[#28282D] wrap-anywhere"
-        >
-          {b.title}
-        </p>
+        {icon}
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-[2px]">
+          <p className="flex items-center gap-xs font-label-sm text-label-sm uppercase text-[#55555A]">
+            {pill}
+            <span className="line-clamp-1 min-w-0">
+              {b.status} • {b.department}
+            </span>
+          </p>
+          <p
+            title={b.title}
+            className="line-clamp-1 font-body-md text-[16px] font-bold leading-tight text-[#28282D] wrap-anywhere"
+          >
+            {b.title}
+          </p>
+        </div>
       </div>
     );
   }
+  // Bureau : même format que la section Points bloquants, sans boutons d'action. La description
+  // n'apparaît que sur une fenêtre d'au moins 1000 px de haut, « Mis à jour » que dès 1280 px de large :
+  // en dessous, la carte n'a pas la place et rien ne doit être coupé.
   return (
     <div
-      className={`${critical ? "accent-bar " : ""}${cardCls} flex min-h-0 min-w-0 flex-col justify-center gap-[4px] overflow-hidden p-xs`}
+      className={`${critical ? "accent-bar " : ""}${cardCls} flex min-h-0 min-w-0 items-start gap-xs overflow-hidden p-xs`}
     >
-      <p className="flex flex-wrap items-center gap-xs font-label-sm text-label-sm uppercase text-[#55555A]">
-        {pill}
-        <span>
-          {b.status} • {b.department}
-        </span>
-      </p>
-      <p className="font-body-md text-[19px] font-bold leading-snug text-[#28282D] wrap-anywhere">
-        {b.title}
-      </p>
+      {icon}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center gap-[4px]">
+        <p
+          title={b.title}
+          className="line-clamp-2 font-body-md text-[16px] font-bold leading-tight text-[#28282D] wrap-anywhere"
+        >
+          {b.title}
+        </p>
+        {b.description && (
+          <p className="hidden text-body-sm text-[#55555A] wrap-anywhere [@media(min-height:1000px)]:line-clamp-1">
+            {b.description}
+          </p>
+        )}
+        <p className="flex min-w-0 flex-nowrap items-center gap-xs font-label-sm text-label-sm uppercase text-[#55555A]">
+          {pill}
+          <span className="line-clamp-1 min-w-0 rounded-[8px] bg-surface-container-highest px-xs">
+            {b.department}
+          </span>
+          <span className="shrink-0 whitespace-nowrap">{b.status}</span>
+          <span className="hidden shrink-0 whitespace-nowrap normal-case min-[1280px]:inline">
+            Mis à jour {timeAgo(b.updated_at)}
+          </span>
+        </p>
+      </div>
     </div>
   );
 }
