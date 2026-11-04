@@ -132,10 +132,10 @@ function ManagerSpace() {
     },
     onSuccess: (count) => {
       if (count === 0) {
-        toast.info("Aucune soumission en attente ou validée sur les 30 derniers jours.");
+        toast.info("Aucune demande en attente ou validée sur les 30 derniers jours.");
         return;
       }
-      toast.success(`${count} soumission${count > 1 ? "s" : ""} exportée${count > 1 ? "s" : ""} au format CSV.`);
+      toast.success(`${count} demande${count > 1 ? "s" : ""} exportée${count > 1 ? "s" : ""} au format CSV.`);
     },
     onError,
   });
@@ -145,7 +145,7 @@ function ManagerSpace() {
     onSuccess: (_d, vars) => {
       if (vars.status === "refusée") {
         setRejecting(null);
-        toast.success("Soumission refusée");
+        toast.success("Demande refusée");
       } else {
         setReading((r) => (r?.id === vars.id ? null : r));
       }
@@ -173,7 +173,7 @@ function ManagerSpace() {
       setSubmissionForm(null);
       setAttachment(null);
       setSubmissionErrors({});
-      toast.success("Soumission envoyée");
+      toast.success("Demande envoyée");
       qc.invalidateQueries({ queryKey: ["submissions"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
     },
@@ -461,7 +461,7 @@ function ManagerSpace() {
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
       {rejecting && (
-        <Modal title="Refuser la soumission" onClose={() => setRejecting(null)}>
+        <Modal title="Refuser la demande" onClose={() => setRejecting(null)}>
           <form
             noValidate
             className="space-y-sm"
@@ -491,7 +491,7 @@ function ManagerSpace() {
               <TextArea
                 rows={4}
                 value={rejectForm.rejection_note}
-                placeholder="Explique au collaborateur pourquoi sa soumission est refusée…"
+                placeholder="Explique au collaborateur pourquoi sa demande est refusée…"
                 onChange={(e) => setRejectForm({ ...rejectForm, rejection_note: e.target.value })}
               />
               <CharCounter value={rejectForm.rejection_note} max={500} />

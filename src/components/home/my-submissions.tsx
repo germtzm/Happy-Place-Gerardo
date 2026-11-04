@@ -127,7 +127,7 @@ export function MySubmissions({
   return (
     <section className="col-span-12 min-w-0 rounded-[8px] bg-surface-container-lowest border border-outline-variant p-md">
       <h2 className="font-headline-sm text-headline-sm text-primary border-b border-outline-variant pb-sm mb-md">
-        Mes soumissions
+        Mes demandes
       </h2>
       <div className="grid auto-rows-fr grid-cols-1 items-stretch gap-xs xl:grid-cols-2">
         {mine.data.map((s) => (

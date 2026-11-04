@@ -86,7 +86,7 @@ export function StaffHome({
         {
           id: "demandes",
           label: "À traiter",
-          title: "Soumissions en attente",
+          title: "Demandes à traiter",
           icon: "pending_actions",
           titleAside: <RequestActions />,
           panel: (
@@ -121,7 +121,7 @@ export function StaffHome({
         {
           id: "mes-demandes",
           label: "Mes demandes",
-          title: "Mes soumissions",
+          title: "Mes demandes",
           icon: "person",
           titleAside: <RequestActions />,
           panel: <MySubmissions embedded email={p.email} onRead={p.onReadSubmission} />,

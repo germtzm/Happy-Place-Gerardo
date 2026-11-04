@@ -50,7 +50,7 @@ export function PendingSubmissions({
     >
       {!embedded && (
         <div className="flex items-center justify-between border-b border-outline-variant pb-sm mb-md">
-          <h2 className="font-headline-sm text-headline-sm text-primary">Soumissions en attente</h2>
+          <h2 className="font-headline-sm text-headline-sm text-primary">Demandes à traiter</h2>
           <NewCountPill count={submissions.data?.length ?? 0} />
         </div>
       )}
@@ -63,12 +63,12 @@ export function PendingSubmissions({
       >
         {submissions.isError && (
           <p className="text-body-sm text-error col-span-full">
-            Les soumissions sont indisponibles.
+            Les demandes sont indisponibles.
           </p>
         )}
         {submissions.data?.length === 0 && (
           <p className="text-body-sm text-on-surface-variant italic col-span-full">
-            Aucune soumission en attente.
+            Aucune demande à traiter.
           </p>
         )}
         {submissions.data?.map((s) => {

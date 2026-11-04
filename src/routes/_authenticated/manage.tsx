@@ -31,7 +31,7 @@ export const Route = createFileRoute("/_authenticated/manage")({
 
 const tabs = [
   { to: "/manage/news", label: "ACTUALITÉS" },
-  { to: "/manage/submissions", label: "SOUMISSIONS" },
+  { to: "/manage/submissions", label: "DEMANDES" },
   { to: "/manage/blockers", label: "POINTS BLOQUANTS" },
   { to: "/manage/metrics", label: "INDICATEURS" },
   { to: "/manage/users", label: "UTILISATEURS AUTORISÉS" },
