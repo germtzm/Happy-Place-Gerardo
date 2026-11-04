@@ -10,6 +10,7 @@ export function ManagerHome(props: HomeProps) {
       isAdmin={false}
       management={{
         label: "Gestion du personnel",
+        hideTitle: true,
         shortLabel: "Personnel",
         icon: "badge",
         panel: (

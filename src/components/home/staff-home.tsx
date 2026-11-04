@@ -27,6 +27,8 @@ export type ManagementTab = {
   /** Libellé court et icône de l'entrée du menu. */
   shortLabel: string;
   icon: string;
+  /** Titre lu mais non affiché (le h1 reste dans le DOM pour le focus et la navigation au clavier). */
+  hideTitle?: boolean;
   panel: ReactNode;
 };
 
@@ -180,18 +182,14 @@ export function StaffHome({
       title: "Indicateurs clés",
       hideTitle: true,
       icon: "monitoring",
-      count: counts.metrics,
-      ariaLabel: named(
-        "Indicateurs clés",
-        counts.metrics,
-        typeof counts.metrics === "number" ? plural(counts.metrics, "publié", "publiés") : "",
-      ),
+      ariaLabel: "Indicateurs clés",
       panel: <MetricsSection isAdmin={isAdmin} />,
     },
     {
       id: "gestion",
       label: management.shortLabel,
       title: management.label,
+      hideTitle: management.hideTitle,
       icon: management.icon,
       count: counts.departures,
       urgent: counts.urgentDepartures > 0,

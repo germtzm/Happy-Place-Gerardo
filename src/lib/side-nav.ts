@@ -41,6 +41,52 @@ export function ancestorGroupIds<T extends { id: string; children?: T[] }>(
   return pathTo(items, id, []) ?? [];
 }
 
+export type BreadcrumbCrumb = {
+  id: string;
+  label: string;
+  /** Entrée à activer au clic : l'entrée elle-même, ou, pour un groupe sans panneau, sa première sous-entrée. */
+  targetId: string;
+};
+
+type CrumbItem = { id: string; label: string; onSelect?: unknown; children?: CrumbItem[] };
+
+function itemPath<T extends CrumbItem>(items: T[], id: string): CrumbItem[] | null {
+  for (const item of items) {
+    if (item.id === id) return [item];
+    const found = item.children ? itemPath(item.children as T[], id) : null;
+    if (found !== null) return [item, ...found];
+  }
+  return null;
+}
+
+/** Première entrée activable (ni groupe, ni action) sous `item`, ou `item` lui-même s'il n'est pas un groupe. */
+function firstTarget(item: CrumbItem): string {
+  if (!item.children) return item.id;
+  for (const child of item.children) {
+    if (child.onSelect) continue;
+    const id = firstTarget(child);
+    if (id) return id;
+  }
+  return item.id;
+}
+
+/**
+ * Fil d'Ariane de l'entrée active : « Vue d'ensemble > groupe > entrée », avec les libellés du menu.
+ * Vide sur la Vue d'ensemble seule ou pour un identifiant inconnu ou d'action.
+ */
+export function breadcrumbTrail(items: CrumbItem[], activeId: string): BreadcrumbCrumb[] {
+  if (activeId === OVERVIEW_ID) return [];
+  const path = itemPath(items, activeId);
+  if (!path || path[path.length - 1].onSelect) return [];
+  const overview = items.find((i) => i.id === OVERVIEW_ID);
+  const full = overview ? [overview, ...path] : path;
+  return full.map((item, i) => ({
+    id: item.id,
+    label: item.label,
+    targetId: i === full.length - 1 ? item.id : firstTarget(item),
+  }));
+}
+
 /**
  * Identifiants des entrées visibles, dans l'ordre : un groupe, puis ses enfants seulement s'il est déplié.
  * C'est la liste que parcourent les flèches du clavier.

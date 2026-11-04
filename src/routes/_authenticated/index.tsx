@@ -104,8 +104,8 @@ function ManagerSpace() {
   const [readingNews, setReadingNews] = useState<News | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   // Section active du menu latéral : un seul état, partagé avec la cloche par HomeContext. À la
-  // connexion, la section d'action du rôle (Demandes, ou En attente pour le collaborateur).
-  const [activeSection, setActiveSection] = useState(canReview ? "demandes" : "en-attente");
+  // connexion et après rechargement, la Vue d'ensemble, pour tous les profils.
+  const [activeSection, setActiveSection] = useState(OVERVIEW_ID);
   // Vue complète ouverte depuis les cartes de la Vue d'ensemble (une seule à la fois).
   const [fullView, setFullView] = useState<FullView | null>(null);
   const lastFullView = useRef<FullView | null>(null);

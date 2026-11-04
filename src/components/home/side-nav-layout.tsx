@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
-import { flattenNavItems } from "@/lib/side-nav";
+import { breadcrumbTrail, flattenNavItems } from "@/lib/side-nav";
 import { SideNav, type SideNavItem } from "./side-nav";
 
 /**
@@ -60,6 +60,7 @@ export function SideNavLayout({
   const active = flattenNavItems([...items, ...bottomItems]).find((i) => i.id === activeId);
   const title = active?.title ?? active?.label ?? "";
   const hideTitle = !!active?.hideTitle;
+  const trail = breadcrumbTrail([...items, ...bottomItems], activeId);
   const hasAside = titleAside !== undefined && titleAside !== null && titleAside !== false;
   const heading = (
     <h1
@@ -92,6 +93,35 @@ export function SideNavLayout({
         aria-labelledby={titleId}
         className="mx-auto w-full min-w-0 max-w-interface flex-1 space-y-md px-sm py-md lg:p-md"
       >
+        {trail.length > 0 && (
+          <nav aria-label="Fil d'Ariane">
+            <ol className="flex flex-wrap items-center gap-x-xs gap-y-0 font-label-md text-label-md text-[#55555A]">
+              {trail.map((crumb, i) => {
+                const last = i === trail.length - 1;
+                return (
+                  <li key={crumb.id} className="flex items-center gap-xs">
+                    {last ? (
+                      <span aria-current="page" className="font-bold text-[#28282D]">
+                        {crumb.label}
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onChange(crumb.targetId)}
+                          className="min-h-[24px] underline hover:text-[#28282D] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#28282D]"
+                        >
+                          {crumb.label}
+                        </button>
+                        <span aria-hidden="true">&gt;</span>
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+        )}
         {hideTitle && !hasAside ? (
           // Titre invisible et rien à droite : pas de rangée, donc aucun espace vertical vide.
           heading

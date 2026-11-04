@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
+  OVERVIEW_ID,
   ancestorGroupIds,
+  breadcrumbTrail,
   flattenNavItems,
   groupKeyAction,
   isNavGroup,
@@ -51,6 +53,44 @@ describe("ancestorGroupIds", () => {
   test("entrée de premier niveau ou inconnue : aucun groupe", () => {
     expect(ancestorGroupIds(tree, "apercu")).toEqual([]);
     expect(ancestorGroupIds(tree, "absent")).toEqual([]);
+  });
+});
+
+describe("breadcrumbTrail", () => {
+  const items = [
+    { id: OVERVIEW_ID, label: "Vue d'ensemble" },
+    {
+      id: "groupe-demandes",
+      label: "Demandes",
+      children: [
+        { id: "demandes", label: "À traiter" },
+        { id: "validees", label: "Validées" },
+      ],
+    },
+    { id: "actualites", label: "Actualités" },
+  ];
+
+  test("Vue d'ensemble seule : aucun fil", () => {
+    expect(breadcrumbTrail(items, OVERVIEW_ID)).toEqual([]);
+  });
+
+  test("entrée à un niveau : Vue d'ensemble puis l'entrée", () => {
+    expect(breadcrumbTrail(items, "actualites")).toEqual([
+      { id: OVERVIEW_ID, label: "Vue d'ensemble", targetId: OVERVIEW_ID },
+      { id: "actualites", label: "Actualités", targetId: "actualites" },
+    ]);
+  });
+
+  test("entrée dans un groupe : le groupe mène à sa première sous-entrée", () => {
+    expect(breadcrumbTrail(items, "validees")).toEqual([
+      { id: OVERVIEW_ID, label: "Vue d'ensemble", targetId: OVERVIEW_ID },
+      { id: "groupe-demandes", label: "Demandes", targetId: "demandes" },
+      { id: "validees", label: "Validées", targetId: "validees" },
+    ]);
+  });
+
+  test("identifiant inconnu : aucun fil", () => {
+    expect(breadcrumbTrail(items, "absent")).toEqual([]);
   });
 });
 
