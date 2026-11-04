@@ -2,8 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { deltaText, fetchMetrics, updateMetric, type Metric } from "@/lib/dashboard";
+import { filterByTeam } from "@/lib/home-lists";
 import { Icon } from "./icon";
 import { formatMetric, metricLabel, metricOf, trendText } from "./metrics-format";
+import { TeamFilter } from "./team-filter";
+import { useTeamFilter } from "./use-team-filter";
 
 const PERF_IMAGE =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuAz-Y4URSqOCzUaVC6vomdu54tTiFPC_bF9A_h0SjxJ1mq2OlNfOyeKTNkPIgtPRloYwE5JrWFm2FHBNUq0GScs0ALDVMiq16FLu95dHNGPjmybEoIb2uyz1OGozRn0XkudSMukcPY4gKfeOJMR_KAnhYbkZifswTCbpCs_aHZyMuoZRz_oc4KsWtWiryTdwVD0EKyvxScj3palbDIM2wMlnH0njPGj912mRwhMmTo3Yu07l6xfVv2Zuw";
@@ -47,7 +50,10 @@ export function MetricsSection({ isAdmin }: { isAdmin: boolean }) {
     },
     onError: (e: unknown) => toast.error((e as Error).message),
   });
+  const [team] = useTeamFilter();
+  // Le NPS à modifier reste cherché dans la liste complète : le filtre ne masque que les tuiles.
   const npsMetric = metricOf(metrics.data, "nps");
+  const tiles = metrics.data ? filterByTeam(metrics.data, team) : undefined;
 
   return (
     <section className="col-span-12 md:col-span-5 bg-surface-container-lowest border border-outline-variant p-md flex flex-col">
@@ -55,7 +61,8 @@ export function MetricsSection({ isAdmin }: { isAdmin: boolean }) {
         <h2 className="font-headline-sm text-headline-sm text-primary">Indicateurs</h2>
         {isAdmin && <Icon name="settings" className="text-on-surface-variant cursor-pointer" />}
       </div>
-      <MetricTiles metrics={metrics.data} />
+      <TeamFilter className="mb-md" />
+      <MetricTiles metrics={tiles} />
       {isAdmin && <div className="space-y-xs">
         <label className="font-label-sm text-label-sm text-on-surface-variant block">
           MODIFIER LE NPS CANDIDATS

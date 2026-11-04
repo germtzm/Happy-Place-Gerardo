@@ -59,6 +59,8 @@ export type Blocker = {
   severity: string;
   status: string;
   updated_at: string;
+  /** Équipes liées lisibles par le connecté ; liste vide = visible de tout le cabinet. */
+  teams: string[];
 };
 
 export type Metric = {
@@ -69,7 +71,19 @@ export type Metric = {
   trend: "hausse" | "baisse" | "stable";
   previous_value: number | null;
   delta: number | string | null;
+  /** Équipes liées lisibles par le connecté ; liste vide = visible de tout le cabinet. */
+  teams: string[];
 };
+
+function sortTeams(teams: string[]): string[] {
+  return [...new Set(teams)].sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }));
+}
+
+type BlockerRow = Omit<Blocker, "teams"> & { blocker_teams: { team: string }[] | null };
+
+function toBlocker({ blocker_teams, ...row }: BlockerRow): Blocker {
+  return { ...row, teams: sortTeams((blocker_teams ?? []).map((link) => link.team)) };
+}
 
 export const TREND_LABELS: Record<Metric["trend"], string> = {
   hausse: "▲ En hausse",
@@ -233,21 +247,21 @@ export async function reviewSubmission(
 export async function fetchBlockers(): Promise<Blocker[]> {
   const { data, error } = await db
     .from("blockers")
-    .select("*")
+    .select("*, blocker_teams(team)")
     .neq("status", "RÉSOLU")
     .order("updated_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as Blocker[];
+  return (data ?? []).map(toBlocker);
 }
 
 export async function fetchResolvedBlockers(): Promise<Blocker[]> {
   const { data, error } = await db
     .from("blockers")
-    .select("*")
+    .select("*, blocker_teams(team)")
     .eq("status", "RÉSOLU")
     .order("updated_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as Blocker[];
+  return (data ?? []).map(toBlocker);
 }
 
 export type ValidatedSubmission = Submission & { validated_at: string | null };
@@ -279,10 +293,25 @@ export async function updateBlockerStatus(input: { id: string; status: string })
   if (error) throw error;
 }
 
+/**
+ * Indicateurs lisibles par le connecté, avec leurs équipes liées. La vue ne porte pas de clé étrangère :
+ * les liaisons sont lues à part (la base ne renvoie que celles du périmètre du connecté, tout pour l'admin).
+ */
 export async function fetchMetrics(): Promise<Metric[]> {
-  const { data, error } = await db.from("metrics_with_trend").select("*");
-  if (error) throw error;
-  return (data ?? []) as Metric[];
+  const [metricsResult, linksResult] = await Promise.all([
+    db.from("metrics_with_trend").select("*"),
+    db.from("metric_teams").select("metric_key, team"),
+  ]);
+  if (metricsResult.error) throw metricsResult.error;
+  if (linksResult.error) throw linksResult.error;
+  const teamsByKey = new Map<string, string[]>();
+  for (const link of linksResult.data ?? []) {
+    teamsByKey.set(link.metric_key, [...(teamsByKey.get(link.metric_key) ?? []), link.team]);
+  }
+  return (metricsResult.data ?? []).map((m) => ({
+    ...m,
+    teams: sortTeams(teamsByKey.get(m.key ?? "") ?? []),
+  })) as Metric[];
 }
 
 export async function updateMetric(input: { key: string; value: number }) {
@@ -788,25 +817,138 @@ export async function deleteMySubmission(id: string) {
 export async function fetchAllBlockers(): Promise<Blocker[]> {
   const { data, error } = await db
     .from("blockers")
-    .select("*")
+    .select("*, blocker_teams(team)")
     .order("updated_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as Blocker[];
+  return (data ?? []).map(toBlocker);
 }
 
-export async function createBlocker(input: BlockerInput) {
-  const { error } = await db
-    .from("blockers")
-    .insert({ ...input, severity: input.severity as Enums["blocker_severity"], status: input.status as Enums["blocker_status"], updated_at: new Date().toISOString() });
+/** Erreur sur les équipes liées : l'élément lui-même, lui, est déjà enregistré. */
+export class TeamLinkError extends Error {
+  constructor(detail: string) {
+    super(
+      `L'élément est enregistré, mais ses équipes concernées n'ont pas pu l'être (${detail}). ` +
+        "Tant qu'aucune équipe n'est liée, il est visible de tout le cabinet. Rouvre-le pour corriger les équipes.",
+    );
+    this.name = "TeamLinkError";
+  }
+}
+
+/** Équipes que l'admin peut lier à un élément : toutes, sauf l'équipe réservée Admin. */
+export async function fetchSelectableTeams(): Promise<string[]> {
+  const { data, error } = await db.from("teams").select("name, is_reserved");
   if (error) throw error;
+  return sortTeams(
+    (data ?? [])
+      .filter((t) => !t.is_reserved && t.name.trim().toLowerCase() !== "admin")
+      .map((t) => t.name),
+  );
 }
 
-export async function updateBlocker(id: string, input: BlockerInput) {
+/**
+ * Remplace l'ensemble des équipes liées à un point bloquant (cet élément seulement). Les liaisons
+ * manquantes sont ajoutées avant de retirer les autres : un échec en cours de route ne peut donc pas
+ * rendre l'élément visible de tout le cabinet. Toute erreur est levée (TeamLinkError), jamais ignorée.
+ */
+export async function replaceBlockerTeams(blockerId: string, teams: string[]) {
+  const wanted = sortTeams(teams);
+  const { data: current, error: readError } = await db
+    .from("blocker_teams")
+    .select("team")
+    .eq("blocker_id", blockerId);
+  if (readError) throw new TeamLinkError(readError.message);
+  const have = (current ?? []).map((r) => r.team);
+  const toAdd = wanted.filter((t) => !have.includes(t));
+  const toRemove = have.filter((t) => !wanted.includes(t));
+  if (toAdd.length > 0) {
+    const { error } = await db
+      .from("blocker_teams")
+      .insert(toAdd.map((team) => ({ blocker_id: blockerId, team })));
+    if (error) throw new TeamLinkError(error.message);
+  }
+  if (toRemove.length > 0) {
+    const { data, error } = await db
+      .from("blocker_teams")
+      .delete()
+      .eq("blocker_id", blockerId)
+      .in("team", toRemove)
+      .select("team");
+    if (error) throw new TeamLinkError(error.message);
+    if ((data?.length ?? 0) !== toRemove.length) {
+      throw new TeamLinkError("retrait refusé : vérifie que tu es admin");
+    }
+  }
+}
+
+/** Même principe que replaceBlockerTeams, pour un indicateur. */
+export async function replaceMetricTeams(metricKey: string, teams: string[]) {
+  const wanted = sortTeams(teams);
+  const { data: current, error: readError } = await db
+    .from("metric_teams")
+    .select("team")
+    .eq("metric_key", metricKey);
+  if (readError) throw new TeamLinkError(readError.message);
+  const have = (current ?? []).map((r) => r.team);
+  const toAdd = wanted.filter((t) => !have.includes(t));
+  const toRemove = have.filter((t) => !wanted.includes(t));
+  if (toAdd.length > 0) {
+    const { error } = await db
+      .from("metric_teams")
+      .insert(toAdd.map((team) => ({ metric_key: metricKey, team })));
+    if (error) throw new TeamLinkError(error.message);
+  }
+  if (toRemove.length > 0) {
+    const { data, error } = await db
+      .from("metric_teams")
+      .delete()
+      .eq("metric_key", metricKey)
+      .in("team", toRemove)
+      .select("team");
+    if (error) throw new TeamLinkError(error.message);
+    if ((data?.length ?? 0) !== toRemove.length) {
+      throw new TeamLinkError("retrait refusé : vérifie que tu es admin");
+    }
+  }
+}
+
+export type MyTeamScope = { isAdmin: boolean; teams: string[] };
+
+/** Équipes proposées par le sélecteur : la sienne et ses manager_teams ; toutes (hors Admin) pour l'admin. */
+export async function fetchMyTeamScope(): Promise<MyTeamScope> {
+  const { data: session } = await db.auth.getSession();
+  const email = session.session?.user.email?.toLowerCase();
+  if (!email) return { isAdmin: false, teams: [] };
+  const { data, error } = await db
+    .from("allowed_users")
+    .select("team, allowed_user_roles(role), manager_teams(team)")
+    .eq("email", email)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return { isAdmin: false, teams: [] };
+  if (data.allowed_user_roles?.role === "admin") {
+    return { isAdmin: true, teams: await fetchSelectableTeams() };
+  }
+  const own = data.team ? [data.team] : [];
+  return { isAdmin: false, teams: sortTeams([...own, ...data.manager_teams.map((t) => t.team)]) };
+}
+
+export async function createBlocker(input: BlockerInput, teams?: string[]) {
+  const { data, error } = await db
+    .from("blockers")
+    .insert({ ...input, severity: input.severity as Enums["blocker_severity"], status: input.status as Enums["blocker_status"], updated_at: new Date().toISOString() })
+    .select("id")
+    .single();
+  if (error) throw error;
+  if (teams) await replaceBlockerTeams(data.id, teams);
+}
+
+export async function updateBlocker(id: string, input: BlockerInput, teams?: string[]) {
   const { error } = await db
     .from("blockers")
     .update({ ...input, severity: input.severity as Enums["blocker_severity"], status: input.status as Enums["blocker_status"], updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+  if (teams) await replaceBlockerTeams(id, teams);
 }
 
 export async function deleteBlocker(id: string) {
@@ -814,17 +956,19 @@ export async function deleteBlocker(id: string) {
   if (error) throw error;
 }
 
-export async function createMetric(input: MetricInput) {
+export async function createMetric(input: MetricInput, teams?: string[]) {
   const { error } = await db.from("metrics").insert(input);
   if (error) throw error;
+  if (teams) await replaceMetricTeams(input.key, teams);
 }
 
-export async function updateMetricRow(key: string, input: MetricInput) {
+export async function updateMetricRow(key: string, input: MetricInput, teams?: string[]) {
   const { error } = await db
     .from("metrics")
     .update({ ...input, updated_at: new Date().toISOString() })
     .eq("key", key);
   if (error) throw error;
+  if (teams) await replaceMetricTeams(key, teams);
 }
 
 export async function deleteMetric(key: string) {

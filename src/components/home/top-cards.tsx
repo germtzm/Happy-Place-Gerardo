@@ -8,9 +8,12 @@ import {
   timeAgo,
   type News,
 } from "@/lib/dashboard";
+import { filterByTeam } from "@/lib/home-lists";
 import { FullViewContext, type FullView } from "./full-view-context";
 import { Icon } from "./icon";
 import { formatMetric, metricLabel, trendText } from "./metrics-format";
+import { TeamFilter } from "./team-filter";
+import { useTeamFilter, useTeamScope } from "./use-team-filter";
 
 const BLOCKERS_SHOWN = 3;
 const METRICS_SHOWN = 3;
@@ -39,14 +42,16 @@ function Card({
   children,
   seeAll,
   view,
+  className = "",
 }: {
   title: string;
   children: ReactNode;
   seeAll: string;
   view: FullView;
+  className?: string;
 }) {
   return (
-    <section className={cardCls}>
+    <section className={`${cardCls} ${className}`}>
       <h2 className={titleCls}>{title}</h2>
       <div className="space-y-xs">{children}</div>
       <SeeAll label={seeAll} view={view} />
@@ -54,18 +59,29 @@ function Card({
   );
 }
 
-/** Moitié haute de l'accueil, identique pour tous les rôles et sans filtre par équipe (lecture seule). */
+/**
+ * Moitié haute de l'accueil (lecture seule). Le sélecteur d'équipe, au-dessus des points bloquants et des
+ * indicateurs, choisit parmi ce que la base renvoie ; les actualités ne sont pas filtrées.
+ */
 export function HomeTopCards({ onReadNews }: { onReadNews: (n: News) => void }) {
   const news = useQuery({ queryKey: ["news"], queryFn: fetchNews, retry: false });
   const blockers = useQuery({ queryKey: ["blockers"], queryFn: fetchBlockers, retry: false });
   const metrics = useQuery({ queryKey: ["metrics"], queryFn: fetchMetrics, retry: false });
+  const [team] = useTeamFilter();
+  const scope = useTeamScope();
+  const showFilter = (scope.data?.teams.length ?? 0) > 0;
   const latest = news.data?.filter((n) => n.status === "publiée").slice(0, 2) ?? [];
-  const shownBlockers = blockers.data?.slice(0, BLOCKERS_SHOWN) ?? [];
-  const shownMetrics = metrics.data?.slice(0, METRICS_SHOWN) ?? [];
+  const shownBlockers = filterByTeam(blockers.data ?? [], team).slice(0, BLOCKERS_SHOWN);
+  const shownMetrics = filterByTeam(metrics.data ?? [], team).slice(0, METRICS_SHOWN);
 
   return (
     <div className="grid grid-cols-1 gap-md md:grid-cols-[3fr_2fr_2fr]">
-      <Card title="Actualités du cabinet" seeAll="VOIR TOUTES LES ACTUALITÉS" view="news">
+      <Card
+        title="Actualités du cabinet"
+        seeAll="VOIR TOUTES LES ACTUALITÉS"
+        view="news"
+        className={showFilter ? "md:col-start-1 md:row-span-2 md:row-start-1" : ""}
+      >
         {news.isError && (
           <p className="text-body-sm text-error">Les actualités sont indisponibles.</p>
         )}
@@ -98,6 +114,8 @@ export function HomeTopCards({ onReadNews }: { onReadNews: (n: News) => void }) 
           </button>
         ))}
       </Card>
+
+      {showFilter && <TeamFilter className="md:col-span-2 md:col-start-2 md:row-start-1" />}
 
       <Card title="Points bloquants" seeAll="VOIR TOUS LES POINTS BLOQUANTS" view="blockers">
         {blockers.isError && (

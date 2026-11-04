@@ -13,10 +13,13 @@ import {
 } from "@/components/manage/crud-ui";
 import { metricSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
 import { MetricHistory } from "@/components/manage/metric-history";
+import { TeamCheckboxes } from "@/components/manage/team-checkboxes";
 import {
   createMetric,
   deleteMetric,
   fetchMetrics,
+  fetchSelectableTeams,
+  TeamLinkError,
   deltaText,
   formatMetricValue,
   updateMetricRow,
@@ -49,20 +52,34 @@ function ManageMetrics() {
   const [editing, setEditing] = useState<Metric | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [toDelete, setToDelete] = useState<Metric | null>(null);
+  const [formTeams, setFormTeams] = useState<string[]>([]);
 
   const list = useQuery({ queryKey: ["metrics"], queryFn: fetchMetrics, retry: false });
+  const teamsQuery = useQuery({
+    queryKey: ["teams", "selectable"],
+    queryFn: fetchSelectableTeams,
+    retry: false,
+  });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["metrics"] });
   const onError = (e: unknown) => toast.error((e as Error).message);
 
   const save = useMutation({
-    mutationFn: (input: MetricInput) =>
-      editing ? updateMetricRow(editing.key, input) : createMetric(input),
+    mutationFn: (v: { input: MetricInput; teams: string[] }) =>
+      editing ? updateMetricRow(editing.key, v.input, v.teams) : createMetric(v.input, v.teams),
     onSuccess: async () => {
       toast.success(editing ? "Indicateur modifié" : "Indicateur créé");
       close();
       await invalidate();
     },
-    onError,
+    onError: (e: unknown) => {
+      onError(e);
+      // L'indicateur est enregistré mais pas ses équipes : on recharge la liste, et à la création on ferme
+      // la fenêtre pour éviter un doublon (il se rouvre depuis la liste pour corriger les équipes).
+      if (e instanceof TeamLinkError) {
+        invalidate();
+        if (!editing) close();
+      }
+    },
   });
 
   const remove = useMutation({
@@ -79,6 +96,7 @@ function ManageMetrics() {
     setForm(null);
     setEditing(null);
     setErrors({});
+    setFormTeams([]);
   }
 
   function submit(e: React.FormEvent) {
@@ -97,7 +115,7 @@ function ManageMetrics() {
       return;
     }
     setErrors({});
-    save.mutate(res.data);
+    save.mutate({ input: res.data, teams: formTeams });
   }
 
   return (
@@ -110,6 +128,7 @@ function ManageMetrics() {
           onClick={() => {
             setEditing(null);
             setErrors({});
+            setFormTeams([]);
             setForm({ ...empty });
           }}
           className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md"
@@ -148,6 +167,7 @@ function ManageMetrics() {
               onEdit={() => {
                 setEditing(m);
                 setErrors({});
+                setFormTeams(m.teams);
                 setForm({
                   key: m.key,
                   label: m.label,
@@ -199,6 +219,13 @@ function ManageMetrics() {
                 onChange={(e) => setForm({ ...form, unit: e.target.value })}
               />
             </Field>
+            <TeamCheckboxes
+              teams={teamsQuery.data}
+              value={formTeams}
+              onChange={setFormTeams}
+              loading={teamsQuery.isLoading}
+              failed={teamsQuery.isError}
+            />
             <FormActions pending={save.isPending} onCancel={close} />
           </form>
         </Modal>

@@ -14,9 +14,18 @@ import {
   type Metric,
   type News,
 } from "@/lib/dashboard";
-import { latestHistory, openBlockersLatestFirst, publishedNewsLatestFirst } from "@/lib/home-lists";
+import {
+  filterByTeam,
+  latestHistory,
+  openBlockersLatestFirst,
+  publishedNewsLatestFirst,
+} from "@/lib/home-lists";
 import { Icon } from "./icon";
 import { formatMetric, metricLabel, trendText } from "./metrics-format";
+import { TeamFilter } from "./team-filter";
+import { useTeamFilter } from "./use-team-filter";
+
+const ALL_FIRM = "Tout le cabinet";
 
 const focusRing =
   "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
@@ -234,7 +243,8 @@ export function BlockersListView({
   onOpenArchive: () => void;
 }) {
   const blockers = useQuery({ queryKey: ["blockers"], queryFn: fetchBlockers, retry: false });
-  const items = openBlockersLatestFirst(blockers.data);
+  const [team] = useTeamFilter();
+  const items = filterByTeam(openBlockersLatestFirst(blockers.data), team);
   const [reading, setReading] = useState<Blocker | null>(null);
   const shown = reading;
 
@@ -253,6 +263,7 @@ export function BlockersListView({
       >
         VOIR L'ARCHIVE DES POINTS RÉSOLUS →
       </button>
+      <TeamFilter />
       <Status
         loading={blockers.isLoading}
         error={blockers.isError}
@@ -300,6 +311,9 @@ export function BlockersListView({
             <Field label="Statut">{shown.status}</Field>
             <Field label="Gravité">{shown.severity === "critical" ? "Critique" : "Normale"}</Field>
             <Field label="Département">{shown.department}</Field>
+            <Field label={isAdmin ? "Équipes concernées" : "Vos équipes concernées"}>
+              {shown.teams.length > 0 ? shown.teams.join(", ") : ALL_FIRM}
+            </Field>
             {shown.description && <Field label="Description">{shown.description}</Field>}
             <Field label="Dernière mise à jour">{formatExactDate(shown.updated_at)}</Field>
           </dl>
@@ -341,7 +355,8 @@ function MetricHistoryList({ metric }: { metric: Metric }) {
 /** B20 : tous les indicateurs publiés ; la lecture affiche aussi les dernières valeurs. */
 export function MetricsListView({ isAdmin, onBack }: { isAdmin: boolean; onBack: () => void }) {
   const metrics = useQuery({ queryKey: ["metrics"], queryFn: fetchMetrics, retry: false });
-  const items = metrics.data ?? [];
+  const [team] = useTeamFilter();
+  const items = filterByTeam(metrics.data ?? [], team);
   const [reading, setReading] = useState<Metric | null>(null);
 
   return (
@@ -351,6 +366,7 @@ export function MetricsListView({ isAdmin, onBack }: { isAdmin: boolean; onBack:
       onBack={onBack}
       editTo={isAdmin ? "/manage/metrics" : undefined}
     >
+      <TeamFilter />
       <Status
         loading={metrics.isLoading}
         error={metrics.isError}
@@ -413,6 +429,9 @@ export function MetricsListView({ isAdmin, onBack }: { isAdmin: boolean; onBack:
                 {reading.previous_value == null
                   ? "Non disponible"
                   : formatMetric({ ...reading, value: reading.previous_value }, "")}
+              </Field>
+              <Field label={isAdmin ? "Équipes concernées" : "Vos équipes concernées"}>
+                {reading.teams.length > 0 ? reading.teams.join(", ") : ALL_FIRM}
               </Field>
             </dl>
             <div className="space-y-xs">

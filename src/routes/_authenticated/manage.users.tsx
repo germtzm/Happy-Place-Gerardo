@@ -37,6 +37,7 @@ type Row = {
 const nameSchema = z.string().trim().max(100, "100 caractères maximum");
 const emailSchema = z.string().trim().toLowerCase().email("Adresse email invalide").max(255);
 const teamSchema = z.string().trim().min(2, "Nom d'équipe trop court").max(60, "60 caractères maximum");
+const MIN_TEAM_MESSAGE = "Un manager doit garder au moins une équipe.";
 
 function UsersPage() {
   const qc = useQueryClient();
@@ -215,7 +216,11 @@ function UsersPage() {
         .eq("allowed_user_id", v.allowedUserId)
         .eq("team", v.team)
         .select("id");
-      if (error) throw error;
+      if (error) {
+        throw new Error(
+          error.message.includes("garder au moins une équipe") ? MIN_TEAM_MESSAGE : error.message,
+        );
+      }
       if (!data?.length) throw new Error("Modification refusée : vérifie que tu es admin");
     },
     onSuccess: () => { toast.success("Équipe retirée"); refresh(); },
@@ -431,13 +436,29 @@ function UsersPage() {
                   <button
                     key={team}
                     type="button"
-                    title={`Retirer l'équipe ${team}`}
+                    title={u.teams.length <= 1 ? MIN_TEAM_MESSAGE : `Retirer l'équipe ${team}`}
+                    disabled={u.teams.length <= 1}
+                    aria-describedby={u.teams.length === 1 ? `last-team-${u.id}` : undefined}
                     onClick={() => removeTeam.mutate({ allowedUserId: u.id, team })}
-                    className="border border-outline-variant bg-surface px-xs py-1 font-label-sm text-label-sm"
+                    className="border border-outline-variant bg-surface px-xs py-1 font-label-sm text-label-sm disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {team} ×
                   </button>
                 ))}
+                {u.teams.length === 1 && (
+                  <span
+                    id={`last-team-${u.id}`}
+                    className="w-full text-body-sm text-on-surface-variant"
+                  >
+                    {MIN_TEAM_MESSAGE}
+                  </span>
+                )}
+                {u.teams.length === 0 && (
+                  <span className="w-full font-label-sm text-label-sm text-error">
+                    <span aria-hidden="true">⚠ </span>
+                    Attention : ce manager n'a aucune équipe. Attribue-lui en au moins une.
+                  </span>
+                )}
 <select
             value={teamInputs[u.id] ?? ""}
             onChange={(e) => setTeamInputs((current) => ({ ...current, [u.id]: e.target.value }))}

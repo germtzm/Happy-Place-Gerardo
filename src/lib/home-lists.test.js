@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { latestHistory, openBlockersLatestFirst, publishedNewsLatestFirst } from "./home-lists";
+import {
+  filterByTeam,
+  latestHistory,
+  openBlockersLatestFirst,
+  publishedNewsLatestFirst,
+} from "./home-lists";
 
 const news = (id, status, created_at) => ({
   id,
@@ -60,5 +65,33 @@ describe("latestHistory", () => {
       2,
     );
     expect(out.map((p) => p.id)).toEqual(["b", "c"]);
+  });
+});
+
+describe("filterByTeam", () => {
+  const item = (id, teams) => ({ id, teams });
+  const items = [
+    item("a", ["Product"]),
+    item("b", ["Marketing", "Product"]),
+    item("c", []),
+    item("d", ["Finance"]),
+  ];
+
+  test("« all » renvoie tout", () => {
+    expect(filterByTeam(items, "all").map((i) => i.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  test("garde les éléments de l'équipe, y compris à plusieurs équipes, et ceux sans équipe", () => {
+    expect(filterByTeam(items, "Product").map((i) => i.id)).toEqual(["a", "b", "c"]);
+    expect(filterByTeam(items, "Marketing").map((i) => i.id)).toEqual(["b", "c"]);
+  });
+
+  test("une équipe sans élément rattaché ne garde que les éléments sans équipe", () => {
+    expect(filterByTeam(items, "Legal").map((i) => i.id)).toEqual(["c"]);
+  });
+
+  test("liste vide et élément sans champ teams", () => {
+    expect(filterByTeam([], "Product")).toEqual([]);
+    expect(filterByTeam([{ id: "x" }], "Product").map((i) => i.id)).toEqual(["x"]);
   });
 });

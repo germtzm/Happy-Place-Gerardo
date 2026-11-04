@@ -13,13 +13,16 @@ import {
   TextArea,
   TextInput,
 } from "@/components/manage/crud-ui";
+import { TeamCheckboxes } from "@/components/manage/team-checkboxes";
 import { blockerSchema, validate, type FieldErrors } from "@/lib/manage-schemas";
 import {
   createBlocker,
   deleteBlocker,
   fetchAllBlockers,
+  fetchSelectableTeams,
   timeAgo,
   updateBlocker,
+  TeamLinkError,
   type Blocker,
   type BlockerInput,
 } from "@/lib/dashboard";
@@ -58,20 +61,34 @@ function ManageBlockers() {
   const [editing, setEditing] = useState<Blocker | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [toDelete, setToDelete] = useState<Blocker | null>(null);
+  const [formTeams, setFormTeams] = useState<string[]>([]);
 
   const list = useQuery({ queryKey: ["blockers", "all"], queryFn: fetchAllBlockers, retry: false });
+  const teamsQuery = useQuery({
+    queryKey: ["teams", "selectable"],
+    queryFn: fetchSelectableTeams,
+    retry: false,
+  });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["blockers"] });
   const onError = (e: unknown) => toast.error((e as Error).message);
 
   const save = useMutation({
-    mutationFn: (input: BlockerInput) =>
-      editing ? updateBlocker(editing.id, input) : createBlocker(input),
+    mutationFn: (v: { input: BlockerInput; teams: string[] }) =>
+      editing ? updateBlocker(editing.id, v.input, v.teams) : createBlocker(v.input, v.teams),
     onSuccess: () => {
       toast.success(editing ? "Point bloquant modifié" : "Point bloquant créé");
       close();
       invalidate();
     },
-    onError,
+    onError: (e: unknown) => {
+      onError(e);
+      // Le point est enregistré mais pas ses équipes : on recharge la liste, et à la création on ferme
+      // la fenêtre pour éviter un doublon (le point se rouvre depuis la liste pour corriger les équipes).
+      if (e instanceof TeamLinkError) {
+        invalidate();
+        if (!editing) close();
+      }
+    },
   });
 
   const remove = useMutation({
@@ -88,6 +105,7 @@ function ManageBlockers() {
     setForm(null);
     setEditing(null);
     setErrors({});
+    setFormTeams([]);
   }
 
   function submit(e: React.FormEvent) {
@@ -99,7 +117,7 @@ function ManageBlockers() {
       return;
     }
     setErrors({});
-    save.mutate(res.data);
+    save.mutate({ input: res.data, teams: formTeams });
   }
 
   return (
@@ -112,6 +130,7 @@ function ManageBlockers() {
           onClick={() => {
             setEditing(null);
             setErrors({});
+            setFormTeams([]);
             setForm({ ...empty });
           }}
           className="px-md py-xs bg-primary text-on-primary font-label-md text-label-md"
@@ -142,6 +161,7 @@ function ManageBlockers() {
               onEdit={() => {
                 setEditing(b);
                 setErrors({});
+                setFormTeams(b.teams);
                 setForm({
                   title: b.title,
                   description: b.description ?? "",
@@ -189,6 +209,13 @@ function ManageBlockers() {
                 onChange={(e) => setForm({ ...form, department: e.target.value })}
               />
             </Field>
+            <TeamCheckboxes
+              teams={teamsQuery.data}
+              value={formTeams}
+              onChange={setFormTeams}
+              loading={teamsQuery.isLoading}
+              failed={teamsQuery.isError}
+            />
             <Field label="Sévérité" error={errors.severity}>
               <Select
                 value={form.severity}

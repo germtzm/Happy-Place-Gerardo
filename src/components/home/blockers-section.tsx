@@ -1,11 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fetchBlockers, timeAgo, updateBlockerStatus } from "@/lib/dashboard";
+import { filterByTeam } from "@/lib/home-lists";
 import { Icon } from "./icon";
+import { TeamFilter } from "./team-filter";
+import { useTeamFilter } from "./use-team-filter";
 
 export function BlockersSection({ isAdmin, onOpenArchive }: { isAdmin: boolean; onOpenArchive: () => void }) {
   const qc = useQueryClient();
   const blockers = useQuery({ queryKey: ["blockers"], queryFn: fetchBlockers, retry: false });
+  const [team] = useTeamFilter();
+  const items = filterByTeam(blockers.data ?? [], team);
   const setBlocker = useMutation({
     mutationFn: updateBlockerStatus,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["blockers"] }),
@@ -30,18 +35,19 @@ export function BlockersSection({ isAdmin, onOpenArchive }: { isAdmin: boolean; 
            VOIR L'ARCHIVE
         </button>
       </div>
+      <TeamFilter className="mb-md" />
       <div className="grid auto-rows-fr grid-cols-1 items-stretch gap-sm xl:grid-cols-2">
         {blockers.isError && (
           <p className="col-span-full text-body-sm text-error">
             Les points bloquants sont indisponibles.
           </p>
         )}
-        {blockers.data?.length === 0 && (
+        {blockers.data && items.length === 0 && (
           <p className="col-span-full text-body-sm text-on-surface-variant italic">
             Aucun point bloquant en cours.
           </p>
         )}
-        {blockers.data?.map((b) => {
+        {items.map((b) => {
           const critical = b.severity === "critical";
           return (
             <div

@@ -17,6 +17,18 @@ export function openBlockersLatestFirst(blockers: Blocker[] | undefined): Blocke
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 }
 
+/** Valeur du sélecteur d'équipe qui ne filtre rien. */
+export const TEAM_FILTER_ALL = "all";
+
+/**
+ * Filtre par équipe choisie. « all » renvoie tout ; sinon les éléments qui ont cette équipe ou aucune
+ * équipe (un élément sans équipe est visible de tout le cabinet). La base décide déjà de ce qui est lisible.
+ */
+export function filterByTeam<T extends { teams: string[] }>(items: T[], team: string): T[] {
+  if (team === TEAM_FILTER_ALL) return items;
+  return items.filter((item) => !item.teams?.length || item.teams.includes(team));
+}
+
 /** Les `count` dernières valeurs de l'historique, la plus récente d'abord. */
 export function latestHistory(
   points: MetricHistoryPoint[] | undefined,
