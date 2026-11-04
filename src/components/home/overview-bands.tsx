@@ -57,11 +57,14 @@ function SeeAll({
   view,
   compact,
   ariaLabel,
+  count,
 }: {
   label: string;
   view: FullView;
   compact: boolean;
   ariaLabel: string;
+  /** Sous md : total affiché entre parenthèses quand l'en-tête est assez large (voir Band). */
+  count?: number;
 }) {
   const openFullView = useContext(FullViewContext);
   return (
@@ -70,9 +73,21 @@ function SeeAll({
       id={`see-all-${view}`}
       aria-label={compact ? ariaLabel : undefined}
       onClick={() => openFullView(view)}
-      className={`inline-flex min-h-[44px] items-center whitespace-nowrap rounded-[8px] px-xs font-label-md text-label-md uppercase text-primary underline underline-offset-2 hover:bg-surface-container ${ringCls}`}
+      className={`inline-flex min-h-[44px] items-center whitespace-nowrap rounded-[8px] font-label-md text-label-md uppercase text-primary underline underline-offset-2 hover:bg-surface-container ${
+        compact ? "px-[4px] tracking-[0.02em]" : "px-xs"
+      } ${ringCls}`}
     >
-      {compact ? "VOIR TOUT" : label} →
+      {compact ? (
+        <>
+          VOIR TOUT
+          {count !== undefined && (
+            <span className="hidden @min-[300px]:inline">&nbsp;({count})</span>
+          )}
+        </>
+      ) : (
+        label
+      )}{" "}
+      →
     </button>
   );
 }
@@ -141,8 +156,10 @@ function StepButtons({
 function Band({
   id,
   title,
+  shortTitle,
   seeAll,
   seeAllAria,
+  seeAllCount,
   view,
   controls,
   children,
@@ -152,8 +169,11 @@ function Band({
 }: {
   id: string;
   title: string;
+  /** Titre affiché sous md ; le nom accessible de la section reste `title`. */
+  shortTitle?: string;
   seeAll: string;
   seeAllAria: string;
+  seeAllCount?: number;
   view: FullView;
   controls?: ReactNode;
   children: ReactNode;
@@ -162,7 +182,15 @@ function Band({
   containerProps?: Record<string, unknown>;
 }) {
   const headingId = `${id}-title`;
-  const link = <SeeAll label={seeAll} view={view} compact={compact} ariaLabel={seeAllAria} />;
+  const link = (
+    <SeeAll
+      label={seeAll}
+      view={view}
+      compact={compact}
+      ariaLabel={seeAllAria}
+      count={seeAllCount}
+    />
+  );
   return (
     <section
       aria-labelledby={headingId}
@@ -171,13 +199,20 @@ function Band({
     >
       {compact ? (
         // Sous md : une seule ligne de 44 px, titre à gauche, puis pause (ou compteur) et lien sans retour à la ligne.
-        <div className="flex h-[44px] shrink-0 items-center justify-between gap-xs rounded-[8px] bg-[#F5F4F1] px-xs">
+        <div className="@container flex h-[44px] shrink-0 items-center justify-between gap-xs rounded-[8px] bg-[#F5F4F1] px-xs">
           <h2
             id={headingId}
             title={title}
             className="line-clamp-1 min-w-0 flex-1 font-display text-[20px] leading-tight text-[#28282D]"
           >
-            {title}
+            {shortTitle ? (
+              <>
+                <span aria-hidden="true">{shortTitle}</span>
+                <span className="sr-only">{title}</span>
+              </>
+            ) : (
+              title
+            )}
           </h2>
           <div className="flex shrink-0 items-center gap-[4px]">
             {controls}
@@ -407,7 +442,7 @@ function NewsCard({
         title={n.title}
         className={`${cardCls} flex h-[54px] w-full min-w-0 items-center gap-xs overflow-hidden px-xs text-left ${ringCls}`}
       >
-        <span className="line-clamp-1 max-w-[40%] shrink-0 rounded-[8px] border border-[#CDCDD1] bg-[#F5F4F1] px-xs font-label-sm text-label-sm uppercase text-[#28282D]">
+        <span className="line-clamp-1 max-w-[60%] shrink-0 whitespace-nowrap rounded-[8px] border border-[#CDCDD1] bg-[#F5F4F1] px-[6px] font-label-sm text-[11.5px] uppercase leading-[1.2] tracking-normal text-[#28282D]">
           {n.author}
         </span>
         <span className="line-clamp-1 min-w-0 flex-1 font-display text-[16px] leading-tight text-[#28282D] wrap-anywhere">
@@ -478,6 +513,7 @@ export function NewsBand({
     <Band
       id="overview-news"
       title="Actualités du cabinet"
+      shortTitle="Actualités"
       seeAll="VOIR TOUTES LES ACTUALITÉS"
       seeAllAria="Voir tout : actualités"
       view="news"
@@ -665,17 +701,13 @@ export function BlockersBand({
       seeAllAria={
         total >= 5 ? `Voir tout : points bloquants (${total})` : "Voir tout : points bloquants"
       }
+      seeAllCount={total >= 5 ? total : undefined}
       view="blockers"
       compact={compact}
       className={className}
       containerProps={auto.containerProps}
       controls={
         <>
-          {compact && total > mobileShown.length && (
-            <span className="whitespace-nowrap font-label-md text-label-md uppercase text-[#28282D]">
-              {mobileShown.length} SUR {total}
-            </span>
-          )}
           {rotates &&
             (auto.reducedMotion ? (
               <StepButtons
