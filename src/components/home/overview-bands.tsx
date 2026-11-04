@@ -48,16 +48,31 @@ function inertRef(el: HTMLElement | null) {
 /* Pièces communes                                                     */
 /* ------------------------------------------------------------------ */
 
-function SeeAll({ label, view }: { label: string; view: FullView }) {
+/**
+ * Lien vers la liste complète. Sous md : texte court « VOIR TOUT » sur une seule ligne, le nom complet
+ * (par exemple « Voir toutes les actualités ») est porté par `aria-label`.
+ */
+function SeeAll({
+  label,
+  view,
+  compact,
+  ariaLabel,
+}: {
+  label: string;
+  view: FullView;
+  compact: boolean;
+  ariaLabel: string;
+}) {
   const openFullView = useContext(FullViewContext);
   return (
     <button
       type="button"
       id={`see-all-${view}`}
+      aria-label={compact ? ariaLabel : undefined}
       onClick={() => openFullView(view)}
-      className={`inline-flex min-h-[44px] items-center rounded-[8px] px-xs font-label-md text-label-md uppercase text-primary underline underline-offset-2 hover:bg-surface-container ${ringCls}`}
+      className={`inline-flex min-h-[44px] items-center whitespace-nowrap rounded-[8px] px-xs font-label-md text-label-md uppercase text-primary underline underline-offset-2 hover:bg-surface-container ${ringCls}`}
     >
-      {label} →
+      {compact ? "VOIR TOUT" : label} →
     </button>
   );
 }
@@ -127,37 +142,59 @@ function Band({
   id,
   title,
   seeAll,
+  seeAllAria,
   view,
   controls,
   children,
   className = "",
+  compact,
   containerProps,
 }: {
   id: string;
   title: string;
   seeAll: string;
+  seeAllAria: string;
   view: FullView;
   controls?: ReactNode;
   children: ReactNode;
   className?: string;
+  compact: boolean;
   containerProps?: Record<string, unknown>;
 }) {
   const headingId = `${id}-title`;
+  const link = <SeeAll label={seeAll} view={view} compact={compact} ariaLabel={seeAllAria} />;
   return (
     <section
       aria-labelledby={headingId}
-      className={`flex min-h-0 min-w-0 flex-col gap-xs ${className}`}
+      className={`flex min-h-0 min-w-0 flex-col gap-[4px] overflow-hidden md:gap-xs ${className}`}
       {...containerProps}
     >
-      <div className="flex flex-wrap items-center justify-between gap-x-sm rounded-[8px] bg-[#F5F4F1] px-sm">
-        <h2 id={headingId} className="font-display text-[24px] leading-tight text-[#28282D]">
-          {title}
-        </h2>
-        <div className="flex flex-wrap items-center gap-xs">
-          <SeeAll label={seeAll} view={view} />
-          {controls}
+      {compact ? (
+        // Sous md : une seule ligne de 44 px, titre à gauche, puis pause (ou compteur) et lien sans retour à la ligne.
+        <div className="flex h-[44px] shrink-0 items-center justify-between gap-xs rounded-[8px] bg-[#F5F4F1] px-xs">
+          <h2
+            id={headingId}
+            title={title}
+            className="line-clamp-1 min-w-0 flex-1 font-display text-[20px] leading-tight text-[#28282D]"
+          >
+            {title}
+          </h2>
+          <div className="flex shrink-0 items-center gap-[4px]">
+            {controls}
+            {link}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-x-sm rounded-[8px] bg-[#F5F4F1] px-sm">
+          <h2 id={headingId} className="font-display text-[24px] leading-tight text-[#28282D]">
+            {title}
+          </h2>
+          <div className="flex flex-wrap items-center gap-xs">
+            {link}
+            {controls}
+          </div>
+        </div>
+      )}
       <div className="min-h-0 flex-1">{children}</div>
     </section>
   );
@@ -203,7 +240,8 @@ function TrendMark({ m }: { m: Metric }) {
         {glyph}
       </span>
       {delta && (
-        <span aria-hidden="true" className="text-primary">
+        // Sous md la place manque : seul le glyphe reste visible, le texte lu garde le delta.
+        <span aria-hidden="true" className="hidden text-primary md:inline">
           {delta}
         </span>
       )}
@@ -215,13 +253,16 @@ function TrendMark({ m }: { m: Metric }) {
 function MetricCard({ m }: { m: Metric }) {
   return (
     <li
-      className={`${cardCls} flex min-w-0 flex-[1_0_118px] flex-col justify-between gap-[4px] p-xs md:flex-[1_0_132px]`}
+      className={`${cardCls} flex h-[72px] min-w-0 flex-[1_0_118px] flex-col justify-between gap-[2px] overflow-hidden px-xs py-[6px] md:h-auto md:flex-[1_0_132px]`}
     >
-      <p className="font-label-sm text-[11.5px] uppercase leading-tight tracking-[0.08em] text-[#55555A] wrap-anywhere">
+      <p
+        title={metricLabel(m, m.label)}
+        className="line-clamp-2 font-label-sm text-[11.5px] uppercase leading-tight tracking-[0.08em] text-[#55555A] wrap-anywhere"
+      >
         {metricLabel(m, m.label)}
       </p>
-      <p className="flex flex-wrap items-baseline gap-x-xs">
-        <span className="font-display text-[32px] leading-none text-[#28282D]">
+      <p className="flex flex-nowrap items-baseline gap-x-xs md:flex-wrap">
+        <span className="font-display text-[24px] leading-none text-[#28282D] md:text-[30px]">
           {formatMetric(m, "—")}
         </span>
         <TrendMark m={m} />
@@ -234,11 +275,13 @@ export function MetricsBand({
   metrics,
   isError,
   loaded,
+  compact,
   className,
 }: {
   metrics: Metric[];
   isError: boolean;
   loaded: boolean;
+  compact: boolean;
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -284,7 +327,9 @@ export function MetricsBand({
       id="overview-metrics"
       title="Indicateurs clés"
       seeAll="VOIR TOUS LES INDICATEURS"
+      seeAllAria="Voir tout : indicateurs"
       view="metrics"
+      compact={compact}
       className={className}
       containerProps={auto.containerProps}
       controls={
@@ -352,46 +397,53 @@ function NewsCard({
   compact: boolean;
   onRead: (n: News) => void;
 }) {
+  if (compact) {
+    // Sous md : toute la carte est le lien (54 px), pastille d'auteur et titre sur une ligne chacun.
+    return (
+      <button
+        type="button"
+        onClick={() => onRead(n)}
+        aria-haspopup="dialog"
+        title={n.title}
+        className={`${cardCls} flex h-[54px] w-full min-w-0 items-center gap-xs overflow-hidden px-xs text-left ${ringCls}`}
+      >
+        <span className="line-clamp-1 max-w-[40%] shrink-0 rounded-[8px] border border-[#CDCDD1] bg-[#F5F4F1] px-xs font-label-sm text-label-sm uppercase text-[#28282D]">
+          {n.author}
+        </span>
+        <span className="line-clamp-1 min-w-0 flex-1 font-display text-[16px] leading-tight text-[#28282D] wrap-anywhere">
+          {n.title}
+        </span>
+      </button>
+    );
+  }
   return (
-    <article
-      className={`${cardCls} flex min-h-0 min-w-0 flex-col gap-xs overflow-hidden p-xs md:p-sm`}
-    >
+    <article className={`${cardCls} flex min-h-0 min-w-0 flex-col gap-[4px] overflow-hidden p-xs`}>
       <p className="flex flex-wrap items-center gap-xs font-label-sm text-label-sm uppercase text-[#55555A]">
         <span className="rounded-[8px] border border-[#CDCDD1] bg-[#F5F4F1] px-xs text-[#28282D]">
           {n.author}
         </span>
         <span>{timeAgo(n.created_at)}</span>
       </p>
-      {compact ? (
-        <button
-          type="button"
-          onClick={() => onRead(n)}
-          aria-haspopup="dialog"
-          className={`rounded-[8px] text-left font-display text-[20px] leading-tight text-[#28282D] wrap-anywhere ${ringCls}`}
-        >
-          <span className="line-clamp-2">{n.title}</span>
-        </button>
-      ) : (
-        <>
-          <h3 className="line-clamp-2 font-display text-[28px] leading-tight text-[#28282D] wrap-anywhere">
-            {n.title}
-          </h3>
-          {n.body && (
-            <p className="line-clamp-3 min-h-0 font-body-md text-[16px] text-[#55555A] wrap-anywhere">
-              {n.body}
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={() => onRead(n)}
-            aria-haspopup="dialog"
-            aria-label={`Lire l'actualité : ${n.title}`}
-            className={`mt-auto inline-flex min-h-[44px] items-center self-start rounded-[8px] font-label-md text-label-md uppercase text-[#28282D] underline underline-offset-2 ${ringCls}`}
-          >
-            LIRE L'ACTUALITÉ →
-          </button>
-        </>
+      <h3
+        title={n.title}
+        className="line-clamp-2 font-display text-[24px] leading-[1.2] text-[#28282D] wrap-anywhere"
+      >
+        {n.title}
+      </h3>
+      {n.body && (
+        <p className="line-clamp-2 min-h-0 font-body-md text-[15px] leading-[1.4] text-[#55555A] wrap-anywhere">
+          {n.body}
+        </p>
       )}
+      <button
+        type="button"
+        onClick={() => onRead(n)}
+        aria-haspopup="dialog"
+        aria-label={`Lire l'actualité : ${n.title}`}
+        className={`mt-auto inline-flex min-h-[44px] items-center self-start rounded-[8px] font-label-md text-label-md uppercase text-[#28282D] underline underline-offset-2 ${ringCls}`}
+      >
+        LIRE L'ACTUALITÉ →
+      </button>
     </article>
   );
 }
@@ -427,13 +479,16 @@ export function NewsBand({
       id="overview-news"
       title="Actualités du cabinet"
       seeAll="VOIR TOUTES LES ACTUALITÉS"
+      seeAllAria="Voir tout : actualités"
       view="news"
+      compact={compact}
       className={className}
       containerProps={auto.containerProps}
       controls={
         multiple && (
           <>
-            <div className="flex items-center">
+            {/* Sous md, la pause et les boutons suffisent : les points de pagination sont masqués. */}
+            <div className="hidden items-center md:flex">
               {pages.map((_, i) => (
                 <button
                   key={i}
@@ -474,7 +529,7 @@ export function NewsBand({
       {pages.length > 0 && (
         <div
           key={current}
-          className="home-fade grid h-full min-h-0 grid-cols-1 content-start gap-sm md:grid-cols-2"
+          className="home-fade grid h-full min-h-0 grid-cols-1 content-start gap-[6px] md:grid-cols-2 md:gap-sm"
         >
           {pages[current].map((n) => (
             <NewsCard key={n.id} n={n} compact={compact} onRead={onReadNews} />
@@ -489,16 +544,42 @@ export function NewsBand({
 /* Points bloquants                                                    */
 /* ------------------------------------------------------------------ */
 
-function BlockerCard({ b }: { b: Blocker }) {
+function BlockerCard({ b, compact }: { b: Blocker; compact: boolean }) {
   const critical = b.severity === "critical";
+  const pill = (
+    <span
+      className={`shrink-0 whitespace-nowrap rounded-[8px] px-xs ${SEVERITY_PILL[b.severity] ?? SEVERITY_PILL.info}`}
+    >
+      {SEVERITY_LABELS[b.severity] ?? SEVERITY_LABELS.info}
+    </span>
+  );
+  if (compact) {
+    // Sous md : 54 px, statut sur une ligne, titre sur une ligne (titre complet en infobulle).
+    return (
+      <div
+        className={`${critical ? "accent-bar " : ""}${cardCls} flex h-[54px] min-w-0 flex-col justify-center gap-[2px] overflow-hidden px-xs`}
+      >
+        <p className="flex items-center gap-xs font-label-sm text-label-sm uppercase text-[#55555A]">
+          {pill}
+          <span className="line-clamp-1 min-w-0">
+            {b.status} • {b.department}
+          </span>
+        </p>
+        <p
+          title={b.title}
+          className="line-clamp-1 font-body-md text-[16px] font-bold leading-tight text-[#28282D] wrap-anywhere"
+        >
+          {b.title}
+        </p>
+      </div>
+    );
+  }
   return (
     <div
       className={`${critical ? "accent-bar " : ""}${cardCls} flex min-h-0 min-w-0 flex-col justify-center gap-[4px] overflow-hidden p-xs`}
     >
       <p className="flex flex-wrap items-center gap-xs font-label-sm text-label-sm uppercase text-[#55555A]">
-        <span className={`rounded-[8px] px-xs ${SEVERITY_PILL[b.severity] ?? SEVERITY_PILL.info}`}>
-          {SEVERITY_LABELS[b.severity] ?? SEVERITY_LABELS.info}
-        </span>
+        {pill}
         <span>
           {b.status} • {b.department}
         </span>
@@ -544,9 +625,9 @@ export function BlockersBand({
   let body: ReactNode = null;
   if (compact) {
     body = (
-      <div className="flex min-h-0 flex-col gap-sm">
+      <div className="flex min-h-0 flex-col gap-[6px]">
         {mobileShown.map((b) => (
-          <BlockerCard key={b.id} b={b} />
+          <BlockerCard key={b.id} b={b} compact />
         ))}
       </div>
     );
@@ -555,12 +636,12 @@ export function BlockersBand({
       <div className="grid h-full min-h-0 grid-cols-2 gap-sm">
         <div className="grid min-h-0 grid-rows-2 gap-sm">
           {plan.pinned.map((b) => (
-            <BlockerCard key={b.id} b={b} />
+            <BlockerCard key={b.id} b={b} compact={false} />
           ))}
         </div>
         <div className="grid min-h-0 grid-rows-2 gap-sm">
           {loopWindow(plan.rotating, current, 2).map((b) => (
-            <BlockerCard key={b.id} b={b} />
+            <BlockerCard key={b.id} b={b} compact={false} />
           ))}
         </div>
       </div>
@@ -570,7 +651,7 @@ export function BlockersBand({
     body = (
       <div className="grid h-full min-h-0 grid-cols-2 grid-rows-2 gap-sm">
         {shown.map((b) => (
-          <BlockerCard key={b.id} b={b} />
+          <BlockerCard key={b.id} b={b} compact={false} />
         ))}
       </div>
     );
@@ -581,13 +662,17 @@ export function BlockersBand({
       id="overview-blockers"
       title="Points bloquants"
       seeAll={seeAllLabel}
+      seeAllAria={
+        total >= 5 ? `Voir tout : points bloquants (${total})` : "Voir tout : points bloquants"
+      }
       view="blockers"
+      compact={compact}
       className={className}
       containerProps={auto.containerProps}
       controls={
         <>
           {compact && total > mobileShown.length && (
-            <span className="rounded-[8px] bg-[#F5F4F1] px-xs font-label-md text-label-md uppercase text-[#28282D]">
+            <span className="whitespace-nowrap font-label-md text-label-md uppercase text-[#28282D]">
               {mobileShown.length} SUR {total}
             </span>
           )}
