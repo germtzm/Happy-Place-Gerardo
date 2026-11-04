@@ -1,5 +1,10 @@
-import type { ReactNode } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useRef, type ReactNode } from "react";
 import type { FieldErrors } from "@/lib/manage-schemas";
+
+/** Premier champ de saisie utile d'une fenêtre : ni masqué, ni fichier, ni case, ni radio, ni désactivé. */
+const FIRST_FIELD =
+  "input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([type=radio]):not([disabled]),select:not([disabled]),textarea:not([disabled])";
 
 export function ManageIcon({ name, className = "" }: { name: string; className?: string }) {
   return (
@@ -57,28 +62,39 @@ export function Modal({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const content = useRef<HTMLDivElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-sm md:p-lg">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className="w-full max-w-2xl bg-surface-container-lowest border border-outline p-md space-y-md"
-      >
-        <div className="flex items-center justify-between border-b border-outline-variant pb-sm">
-          <h2 className="font-headline-sm text-headline-sm text-primary">{title}</h2>
-          <button
-            type="button"
-            aria-label="Fermer"
-            onClick={onClose}
-            className="text-on-surface-variant hover:text-primary"
-          >
-            <ManageIcon name="close" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
+    <DialogPrimitive.Root open onOpenChange={(o) => !o && onClose()}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <DialogPrimitive.Content
+          ref={content}
+          aria-describedby={undefined}
+          onOpenAutoFocus={(e) => {
+            // Le focus entre sur le premier champ du formulaire, sinon sur « Fermer ».
+            e.preventDefault();
+            const first = content.current?.querySelector<HTMLElement>(FIRST_FIELD);
+            (first ?? closeButton.current)?.focus();
+          }}
+          className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-4rem)] w-[calc(100vw-24px)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col border border-outline bg-surface-container-lowest focus:outline-none"
+        >
+          <div className="flex shrink-0 items-center justify-between gap-sm border-b border-outline-variant px-sm py-xs md:px-md">
+            <DialogPrimitive.Title className="font-headline-sm text-headline-sm text-primary wrap-anywhere">
+              {title}
+            </DialogPrimitive.Title>
+            <DialogPrimitive.Close
+              ref={closeButton}
+              aria-label="Fermer"
+              className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center text-on-surface-variant hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <ManageIcon name="close" />
+            </DialogPrimitive.Close>
+          </div>
+          <div className="min-h-0 flex-1 space-y-sm overflow-y-auto p-sm md:p-md">{children}</div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 

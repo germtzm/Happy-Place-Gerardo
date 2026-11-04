@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import {
   ErrorSummary,
@@ -22,9 +22,6 @@ import {
 } from "@/lib/news-media";
 
 export type NewsDialogState = { mode: "create" } | { mode: "edit"; news: News };
-
-const FOCUSABLE =
-  "a[href],button:not([disabled]),input:not([disabled]):not([type=file]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])";
 
 /**
  * État de la fenêtre, remonté dans le parent : le bouton de création peut être rendu hors du composant
@@ -92,7 +89,6 @@ export function NewsFormDialog({
 }) {
   const editing = state.mode === "edit" ? state.news : null;
   const qc = useQueryClient();
-  const root = useRef<HTMLDivElement>(null);
   const helpId = useId();
   const [form, setForm] = useState<NewsInput>(() => ({
     title: editing?.title ?? "",
@@ -131,32 +127,10 @@ export function NewsFormDialog({
     onError: (e: unknown) => toast.error((e as Error).message),
   });
 
-  // À l'ouverture, le focus entre dans la fenêtre (champ Titre).
-  useEffect(() => {
-    root.current?.querySelector<HTMLElement>("input:not([type=file]):not([disabled])")?.focus();
-  }, []);
-
-  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      if (!save.isPending) onClose();
-      return;
-    }
-    if (e.key !== "Tab") return;
-    // Le focus reste dans la fenêtre tant qu'elle est ouverte.
-    const items = Array.from(root.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
-    if (items.length === 0) return;
-    const first = items[0];
-    const last = items[items.length - 1];
-    const active = document.activeElement;
-    const outside = !root.current?.contains(active);
-    if (e.shiftKey && (active === first || outside)) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && (active === last || outside)) {
-      e.preventDefault();
-      first.focus();
-    }
+  // Échap, croix et clic extérieur ne ferment pas la fenêtre pendant l'enregistrement. Le piège de
+  // focus et le focus initial sont assurés par Modal (Radix Dialog).
+  function requestClose() {
+    if (!save.isPending) onClose();
   }
 
   function submit(e: FormEvent) {
@@ -173,8 +147,8 @@ export function NewsFormDialog({
   }
 
   return (
-    <div ref={root} onKeyDown={onKeyDown}>
-      <Modal title={editing ? "Modifier l'actualité" : "Nouvelle actualité"} onClose={onClose}>
+    <>
+      <Modal title={editing ? "Modifier l'actualité" : "Nouvelle actualité"} onClose={requestClose}>
         <form onSubmit={submit} className="space-y-sm" noValidate>
           <ErrorSummary errors={errors} />
           <Field label="Titre" error={errors.title}>
@@ -231,6 +205,6 @@ export function NewsFormDialog({
           <FormActions pending={save.isPending} pendingLabel="Enregistrement…" onCancel={onClose} />
         </form>
       </Modal>
-    </div>
+    </>
   );
 }
