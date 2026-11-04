@@ -121,20 +121,21 @@ export function ValidatedSubmissions({
       {q.data && filtered.length === 0 && (
         <p className="text-body-sm text-on-surface-variant italic">Aucune demande validée pour le moment.</p>
       )}
-      <div className="grid gap-xs md:grid-cols-2">
+      <div className="grid auto-rows-fr gap-xs md:grid-cols-2">
         {shown.map((s) => (
-          <div key={s.id} className="p-sm rounded-[8px] border border-outline-variant bg-card min-w-0 overflow-hidden space-y-xs">
+          <div key={s.id} className="h-full p-sm rounded-[8px] border border-outline-variant bg-card min-w-0 overflow-hidden space-y-xs">
             <p className="text-[11px] font-label-sm text-on-surface-variant uppercase wrap-anywhere">
               <span className="text-primary font-bold">{s.author_name}</span><AuthorHiddenNote s={s} /> • {s.team} •{" "}
               {s.validated_at ? `Validée le ${formatExactDate(s.validated_at)}` : `Soumise le ${formatExactDate(s.created_at)}`}
             </p>
-            <SubmissionPreview content={s.content} onOpen={() => onRead(s)} />
-            {s.attachment_path &&
-              (canReadAttachment(s, { role, email, managerTeams }) ? (
-                <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
-              ) : (
-                <p className="text-[11px] font-label-sm text-on-surface-variant italic">Pièce jointe réservée à l'équipe</p>
-              ))}
+            <SubmissionPreview content={s.content} onOpen={() => onRead(s)} lines={1} reserveMore />
+            {s.attachment_path && !canReadAttachment(s, { role, email, managerTeams }) ? (
+              <p className="text-[11px] font-label-sm text-on-surface-variant italic">Pièce jointe réservée à l'équipe</p>
+            ) : (
+              <div>
+                <AttachmentLink path={s.attachment_path} name={s.attachment_name} showEmpty />
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -45,9 +45,15 @@ export function SubmissionPreview({
   content,
   onOpen,
   emphasis = false,
+  lines = 3,
+  reserveMore = false,
 }: {
+  /** Réserve la hauteur du bouton « Voir plus » quand il n'est pas affiché (cartes de même hauteur) ; invisible et masqué aux lecteurs d'écran. */
+  reserveMore?: boolean;
   content: string;
   onOpen: () => void;
+  /** Nombre de lignes de l'aperçu : 3 par défaut, 1 pour les cartes compactes. */
+  lines?: 1 | 3;
   /** Texte au premier plan (14 px, #232428) pour les demandes à traiter ; les autres listes gardent le rendu discret. */
   emphasis?: boolean;
 }) {
@@ -68,7 +74,7 @@ export function SubmissionPreview({
     <div className="min-w-0 space-y-xs">
       <p
         ref={ref}
-        className={`font-body-sm italic whitespace-pre-line wrap-anywhere line-clamp-3 ${
+        className={`font-body-sm italic whitespace-pre-line wrap-anywhere ${lines === 1 ? "line-clamp-1" : "line-clamp-3"} ${
           emphasis
             ? "text-[14px] leading-[1.5] text-[#232428]"
             : "text-body-sm text-on-surface-variant"
@@ -85,6 +91,11 @@ export function SubmissionPreview({
         >
           Voir plus
         </button>
+      )}
+      {!overflows && reserveMore && (
+        <span aria-hidden="true" className="invisible block font-label-sm text-label-sm">
+          Voir plus
+        </span>
       )}
     </div>
   );

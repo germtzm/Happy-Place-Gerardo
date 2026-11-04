@@ -7,6 +7,7 @@ import { fetchMySubmissions, timeAgo, type Submission } from "@/lib/dashboard";
 import { canManageOwnSubmission, submissionLabel } from "@/lib/own-submission";
 import { waitingDays, waitingLabel } from "@/lib/waiting";
 import { CardActionButton } from "./card-action-button";
+import { LIST_CARD_CLS } from "./pending-submissions";
 import { SubmissionActionsContext } from "./submission-actions-context";
 
 /** Validateurs : undefined = inconnu (masqué), "" = aucun manager. Attente : date de début, si connue. */
@@ -29,11 +30,21 @@ export function MySubmissionItem({
     // self-stretch : même hauteur que les voisines de la rangée, quel que soit l'alignement de la grille.
     <div className="flex min-h-28 min-w-0 flex-col gap-xs self-stretch overflow-hidden rounded-[8px] border border-outline-variant bg-card p-sm sm:flex-row sm:items-stretch">
       <div className="min-w-0 flex-1">
-        <SubmissionPreview content={s.content} onOpen={() => onRead(s)} />
-        <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
+        <SubmissionPreview content={s.content} onOpen={() => onRead(s)} lines={1} />
         <p className="text-[11px] font-label-sm text-on-surface-variant uppercase mt-xs">
           {s.status} • {s.team} • {timeAgo(s.created_at)}
         </p>
+        <div>
+          <AttachmentLink path={s.attachment_path} name={s.attachment_name} showEmpty />
+        </div>
+        {s.status === "refusée" && s.rejection_category && (
+          <div className="mt-xs p-xs bg-error-container text-on-error-container text-body-sm wrap-anywhere">
+            <p className="font-bold">Motif : {s.rejection_category}</p>
+            <p className="whitespace-pre-line">
+              Raison : <Linkify text={s.rejection_note ?? ""} />
+            </p>
+          </div>
+        )}
         {s.hide_author && (
           <p className="text-[11px] font-label-sm uppercase mt-xs">
             Signée : {s.author_name} <span className="text-[#68686D]">(masqué pour l'équipe)</span>
@@ -51,14 +62,6 @@ export function MySubmissionItem({
                 {waitingLabel(waitingDays(waitingSince))}
               </span>
             )}
-          </div>
-        )}
-        {s.status === "refusée" && s.rejection_category && (
-          <div className="mt-xs p-xs bg-error-container text-on-error-container text-body-sm wrap-anywhere">
-            <p className="font-bold">Motif : {s.rejection_category}</p>
-            <p className="whitespace-pre-line">
-              Raison : <Linkify text={s.rejection_note ?? ""} />
-            </p>
           </div>
         )}
       </div>
@@ -105,7 +108,7 @@ export function MySubmissions({
 
   if (embedded) {
     return (
-      <div className="min-w-0">
+      <div className={`min-w-0 ${LIST_CARD_CLS}`}>
         {mine.isLoading && <p className="text-body-sm text-on-surface-variant">Chargement…</p>}
         {mine.isError && (
           <p className="text-body-sm text-error">Tes demandes sont indisponibles.</p>
@@ -125,7 +128,7 @@ export function MySubmissions({
   if (!mine.data || mine.data.length === 0) return null;
 
   return (
-    <section className="col-span-12 min-w-0 rounded-[8px] bg-surface-container-lowest border border-outline-variant p-md">
+    <section className={`col-span-12 min-w-0 ${LIST_CARD_CLS}`}>
       <h2 className="font-headline-sm text-headline-sm text-primary border-b border-outline-variant pb-sm mb-md">
         Mes demandes
       </h2>

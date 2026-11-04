@@ -116,7 +116,7 @@ export function MyRequestsSections({
   requestSections.push({
     id: "equipe",
     label: "Validées équipe",
-    title: "Validées de l'équipe",
+    title: "Demandes validées de l'équipe",
     icon: "groups",
     panel: (
       <ValidatedSubmissions

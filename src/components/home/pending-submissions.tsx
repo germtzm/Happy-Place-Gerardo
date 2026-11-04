@@ -4,7 +4,12 @@ import { AuthorHiddenNote } from "@/components/author-hidden-note";
 import { CardActionButton } from "./card-action-button";
 import { SubmissionPreview } from "@/components/expandable-card";
 import { canDecideSubmission, fetchSubmissions, timeAgo, type Submission } from "@/lib/dashboard";
+import { SubmissionHistory } from "@/components/manage/submission-history";
 import { Icon } from "./icon";
+
+/** Carte unique qui entoure une liste de demandes (À traiter et Mes demandes en mode intégré). */
+export const LIST_CARD_CLS =
+  "rounded-[8px] bg-surface-container-lowest border border-outline-variant p-md";
 
 /** Pastille « N NOUVELLES » : à côté du titre de section dans le menu latéral, dans l'en-tête de la carte sinon. */
 export function NewCountPill({ count }: { count: number }) {
@@ -44,8 +49,8 @@ export function PendingSubmissions({
     <section
       className={
         embedded
-          ? "min-w-0 flex flex-col"
-          : "col-span-12 lg:col-span-4 min-w-0 rounded-[8px] bg-surface-container-lowest border border-outline-variant p-md flex flex-col"
+          ? `min-w-0 flex flex-col ${LIST_CARD_CLS}`
+          : `col-span-12 lg:col-span-4 min-w-0 flex flex-col ${LIST_CARD_CLS}`
       }
     >
       {!embedded && (
@@ -92,28 +97,33 @@ export function PendingSubmissions({
                       {s.team}
                     </p>
                   </div>
-                  <span className="text-[12px] text-on-surface-variant font-label-sm whitespace-nowrap">
-                    {timeAgo(s.created_at)}
-                  </span>
                 </div>
                 <SubmissionPreview content={s.content} onOpen={() => onRead(s)} emphasis />
-                <AttachmentLink path={s.attachment_path} name={s.attachment_name} />
+                <div>
+                  <AttachmentLink path={s.attachment_path} name={s.attachment_name} showEmpty />
+                </div>
+                <SubmissionHistory submissionId={s.id} />
                 {canReview && !decides && (
                   <p className="pt-xs text-body-sm italic text-on-surface-variant">
                     Ta demande : un autre manager ou un admin la traite.
                   </p>
                 )}
               </div>
-              {decides && (
-                <div className="flex shrink-0 flex-col justify-center gap-2 sm:items-end">
-                  <CardActionButton variant="reject" onClick={() => onReject(s)}>
-                    REFUSER
-                  </CardActionButton>
-                  <CardActionButton variant="validate" onClick={() => onApprove(s)}>
-                    VALIDER
-                  </CardActionButton>
-                </div>
-              )}
+              <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                <span className="text-[12px] text-on-surface-variant font-label-sm whitespace-nowrap sm:text-right">
+                  {timeAgo(s.created_at)}
+                </span>
+                {decides && (
+                  <div className="flex flex-col justify-center gap-2 sm:flex-1 sm:items-end">
+                    <CardActionButton variant="reject" onClick={() => onReject(s)}>
+                      REFUSER
+                    </CardActionButton>
+                    <CardActionButton variant="validate" onClick={() => onApprove(s)}>
+                      VALIDER
+                    </CardActionButton>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}

@@ -19,8 +19,23 @@ async function openAttachment(path: string) {
   else window.open(data.signedUrl, "_blank", "noopener");
 }
 
-export function AttachmentLink({ path, name }: { path?: string | null; name?: string | null }) {
-  if (!path) return null;
+export function AttachmentLink({
+  path,
+  name,
+  showEmpty = false,
+}: {
+  path?: string | null;
+  name?: string | null;
+  /** Sans pièce jointe, affiche « Pas de pièce jointe » au lieu de rien (faux par défaut). */
+  showEmpty?: boolean;
+}) {
+  if (!path) {
+    return showEmpty ? (
+      <span className="inline-flex items-center mt-xs max-w-full font-label-sm text-label-sm text-on-surface-variant">
+        Pas de pièce jointe
+      </span>
+    ) : null;
+  }
   const label = name ?? "Document joint";
   return (
     <span className="inline-flex items-center gap-xs mt-xs max-w-full">
