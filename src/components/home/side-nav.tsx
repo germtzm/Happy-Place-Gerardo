@@ -52,7 +52,8 @@ type Props = {
   /** Groupe placé en bas du rail : sections (Notifications, Récapitulatif) puis entrées d'action. */
   bottomItems?: SideNavItem[];
   activeId: string;
-  onChange: (id: string) => void;
+  /** `keepFocus` : changement de section déclenché par le menu lui-même, le focus ne va pas au titre. */
+  onChange: (id: string, opts?: { keepFocus?: boolean }) => void;
 };
 
 /** État des groupes dépliés, partagé entre le rail et le menu replié (état React local, jamais stocké). */
@@ -312,7 +313,7 @@ export function SideNav(props: Props) {
     if (ancestorGroupIds(all, props.activeId).includes(id)) return;
     const group = flattenNavItems(all).find((i) => i.id === id);
     const first = group?.children?.find((c) => !c.onSelect && !isNavGroup(c));
-    if (first) props.onChange(first.id);
+    if (first) props.onChange(first.id, { keepFocus: true });
   }
 
   return (

@@ -50,12 +50,24 @@ export function SideNavLayout({
   const titleId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const shownId = useRef(activeId);
+  const skipFocus = useRef(false);
 
   useEffect(() => {
+    if (skipFocus.current) {
+      // Changement venu du menu (dépliage d'un groupe) : le focus reste sur le bouton du groupe.
+      skipFocus.current = false;
+      shownId.current = activeId;
+      return;
+    }
     if (shownId.current === activeId) return;
     shownId.current = activeId;
     titleRef.current?.focus();
   }, [activeId]);
+
+  function onMenuChange(id: string, opts?: { keepFocus?: boolean }) {
+    if (opts?.keepFocus) skipFocus.current = true;
+    onChange(id);
+  }
 
   const active = flattenNavItems([...items, ...bottomItems]).find((i) => i.id === activeId);
   const title = active?.title ?? active?.label ?? "";
@@ -87,7 +99,12 @@ export function SideNavLayout({
       >
         Aller au contenu
       </a>
-      <SideNav items={items} bottomItems={bottomItems} activeId={activeId} onChange={onChange} />
+      <SideNav
+        items={items}
+        bottomItems={bottomItems}
+        activeId={activeId}
+        onChange={onMenuChange}
+      />
       <section
         id="contenu-principal"
         aria-labelledby={titleId}
