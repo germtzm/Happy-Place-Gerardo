@@ -300,12 +300,19 @@ export function SideNav(props: Props) {
   }
 
   function onToggle(id: string) {
+    const opening = !expanded.has(id);
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+    if (!opening) return;
+    // Déplier un groupe dont aucune entrée n'est active ouvre sa première section (B41).
+    if (ancestorGroupIds(all, props.activeId).includes(id)) return;
+    const group = flattenNavItems(all).find((i) => i.id === id);
+    const first = group?.children?.find((c) => !c.onSelect && !isNavGroup(c));
+    if (first) props.onChange(first.id);
   }
 
   return (
